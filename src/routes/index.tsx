@@ -416,7 +416,7 @@ function Game() {
           const h = s.hunters[i];
           if (Math.floor(p.x) === h.x && Math.floor(p.y) === h.y) {
             s.score += 15;
-            s.coins += 2;
+            
             s.hunters.splice(i, 1);
             // respawn at edge far from player
             s.hunters.push({ ...randPos(), cooldown: 0 });
