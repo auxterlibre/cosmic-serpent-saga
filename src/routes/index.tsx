@@ -112,6 +112,7 @@ function Game() {
     coins: 0,
     fireIntervalMs: 2000,
     damage: 1,
+    fireRange: 8,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
 
