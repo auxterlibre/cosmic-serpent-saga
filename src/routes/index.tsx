@@ -421,9 +421,10 @@ function Game() {
       const dt = now - last;
       last = now;
       acc += dt;
-      while (acc >= TICK_MS) {
+      const tickMs = stateRef.current.boost ? TICK_MS / 2 : TICK_MS;
+      while (acc >= tickMs) {
         tick();
-        acc -= TICK_MS;
+        acc -= tickMs;
       }
       updateRealtime(dt);
       draw();
