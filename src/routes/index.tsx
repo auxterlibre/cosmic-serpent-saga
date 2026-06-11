@@ -91,6 +91,7 @@ function initialState() {
     coins: 0,
     fireIntervalMs: 2000,
     damage: 1,
+    fireRange: 8, // in cells
     fireTimer: 0, // ms since last shot
     hunterTimer: 0, // ms accumulator for hunter movement
     paused: false,
@@ -111,6 +112,7 @@ function Game() {
     coins: 0,
     fireIntervalMs: 2000,
     damage: 1,
+    fireRange: 8,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
 
@@ -139,11 +141,6 @@ function Game() {
       }
       if (e.key === "Escape") {
         closeShop();
-        return;
-      }
-      if (e.key === " ") {
-        e.preventDefault();
-        manualFire();
         return;
       }
       if (e.key === "Shift") {
@@ -190,7 +187,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 3, alive: true, coins: 0, fireIntervalMs: 2000, damage: 1 });
+    setHud({ score: 0, length: 3, alive: true, coins: 0, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
     setShop({ open: false, checkpoint: null });
   }
 
@@ -201,12 +198,6 @@ function Game() {
     setShop({ open: false, checkpoint: null });
   }
 
-  function manualFire() {
-    const s = stateRef.current;
-    if (!s.alive || s.paused) return;
-    // force a shot on next realtime update by maxing the fire timer
-    s.fireTimer = s.fireIntervalMs;
-  }
 
   function buyFireRate() {
     const s = stateRef.current;
@@ -225,6 +216,15 @@ function Game() {
     s.damage += 1;
     syncHud();
   }
+  function buyRange() {
+    const s = stateRef.current;
+    const cost = 6;
+    if (s.coins < cost) return;
+    if (s.fireRange >= 30) return;
+    s.coins -= cost;
+    s.fireRange += 2;
+    syncHud();
+  }
   function syncHud() {
     const s = stateRef.current;
     setHud({
@@ -234,6 +234,7 @@ function Game() {
       coins: s.coins,
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
+      fireRange: s.fireRange,
     });
   }
 
@@ -343,33 +344,39 @@ function Game() {
       // Firing
       s.fireTimer += dt;
       if (s.fireTimer >= s.fireIntervalMs) {
-        s.fireTimer = 0;
         const head = s.snake[0];
         if (head) {
-          // closest target among enemies + hunters
+          const rangeSq = s.fireRange * s.fireRange;
+          // closest target within range among enemies + hunters
           type T = { x: number; y: number; d2: number };
           let best: T | null = null;
           const consider = (x: number, y: number) => {
             const dx = x - head.x;
             const dy = y - head.y;
             const d2 = dx * dx + dy * dy;
+            if (d2 > rangeSq) return;
             if (!best || d2 < best.d2) best = { x, y, d2 };
           };
           for (const e of s.enemies) consider(e.x + (e.big ? 0.5 : 0), e.y + (e.big ? 0.5 : 0));
           for (const h of s.hunters) consider(h.x, h.y);
           if (best) {
+            s.fireTimer = 0;
             const b: T = best;
             const dx = b.x - head.x;
             const dy = b.y - head.y;
             const len = Math.hypot(dx, dy) || 1;
             const speed = 25; // cells/sec
+            const lifeMs = ((s.fireRange + 1) / speed) * 1000;
             s.projectiles.push({
               x: head.x + 0.5,
               y: head.y + 0.5,
               vx: (dx / len) * speed,
               vy: (dy / len) * speed,
-              life: 2000,
+              life: lifeMs,
             });
+          } else {
+            // no target in range; cap timer so we don't spam-check forever
+            s.fireTimer = s.fireIntervalMs;
           }
         }
       }
@@ -531,6 +538,19 @@ function Game() {
         ctx.fillStyle = i === 0 ? "#7df9ff" : "#3aa8b8";
         ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
       });
+
+      // fire range indicator around head
+      if (s.snake[0]) {
+        const hx = s.snake[0].x * CELL + CELL / 2 - camX;
+        const hy = s.snake[0].y * CELL + CELL / 2 - camY;
+        ctx.strokeStyle = "rgba(125, 249, 255, 0.18)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(hx, hy, s.fireRange * CELL, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     };
 
     raf = requestAnimationFrame(loop);
@@ -544,8 +564,8 @@ function Game() {
         <div>SCORE: {hud.score}</div>
         <div>LENGTH: {hud.length}</div>
         <div>COINS: {hud.coins}</div>
-        <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage}</div>
-        <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Space fire · Shift boost · P pause · R reset</div>
+        <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage} · RNG: {hud.fireRange}</div>
+        <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Shift boost · P pause · R reset</div>
         <div className="text-xs text-cyan-400/70">Find purple $ stations to upgrade</div>
       </div>
 
@@ -557,7 +577,6 @@ function Game() {
             stateRef.current.nextDir = d;
           }}
           onReset={reset}
-          onFire={manualFire}
         />
       )}
 
@@ -583,6 +602,14 @@ function Game() {
               >
                 Damage +1 — 8 coins
                 <div className="text-xs opacity-60">Current: {hud.damage}</div>
+              </button>
+              <button
+                onClick={buyRange}
+                disabled={hud.coins < 6 || hud.fireRange >= 30}
+                className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
+              >
+                Range +2 — 6 coins
+                <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
               </button>
             </div>
             <button
@@ -616,11 +643,9 @@ function Game() {
 function OnScreenDpad({
   onDir,
   onReset,
-  onFire,
 }: {
   onDir: (d: Dir) => void;
   onReset: () => void;
-  onFire: () => void;
 }) {
   const btn =
     "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md border border-cyan-500/40 bg-black/50 font-mono text-lg text-cyan-200 backdrop-blur active:bg-cyan-500/40 select-none touch-none";
@@ -629,37 +654,23 @@ function OnScreenDpad({
     onDir(d);
   };
   return (
-    <>
-      <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
-        <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
-        <div className="flex gap-1">
-          <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
-          <button
-            className={btn + " text-xs"}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              onReset();
-            }}
-            aria-label="Reset"
-          >
-            R
-          </button>
-          <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
-        </div>
-        <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
+    <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
+      <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
+      <div className="flex gap-1">
+        <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
+        <button
+          className={btn + " text-xs"}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            onReset();
+          }}
+          aria-label="Reset"
+        >
+          R
+        </button>
+        <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
       </div>
-      <button
-        className={
-          "pointer-events-auto absolute bottom-16 left-6 flex h-16 w-16 items-center justify-center rounded-full border border-yellow-400/50 bg-black/50 font-mono text-sm text-yellow-200 backdrop-blur active:bg-yellow-500/40 select-none touch-none"
-        }
-        onPointerDown={(e) => {
-          e.preventDefault();
-          onFire();
-        }}
-        aria-label="Fire"
-      >
-        FIRE
-      </button>
-    </>
+      <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
+    </div>
   );
 }
