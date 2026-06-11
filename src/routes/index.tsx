@@ -275,7 +275,7 @@ function Game() {
         s.loot.splice(lootIdx, 1);
         s.loot.push(randPos());
         s.score += 10;
-        s.coins += 1;
+        
         grew = true;
       }
 
