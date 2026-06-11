@@ -466,20 +466,27 @@ function Game() {
 
       const viewW = c.width;
       const viewH = c.height;
-      let camX = head.x * CELL + CELL / 2 - viewW / 2;
-      let camY = head.y * CELL + CELL / 2 - viewH / 2;
-      camX = Math.max(0, Math.min(WORLD_W * CELL - viewW, camX));
-      camY = Math.max(0, Math.min(WORLD_H * CELL - viewH, camY));
+      // Zoom out on portrait / narrow viewports so more of the world is visible
+      const portrait = viewH > viewW;
+      const zoom = portrait ? Math.min(1, Math.max(0.45, viewW / 900)) : 1;
+      const wViewW = viewW / zoom; // visible world-pixel width
+      const wViewH = viewH / zoom;
+      let camX = head.x * CELL + CELL / 2 - wViewW / 2;
+      let camY = head.y * CELL + CELL / 2 - wViewH / 2;
+      camX = Math.max(0, Math.min(WORLD_W * CELL - wViewW, camX));
+      camY = Math.max(0, Math.min(WORLD_H * CELL - wViewH, camY));
 
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = "#0a0a18";
       ctx.fillRect(0, 0, viewW, viewH);
+      ctx.setTransform(zoom, 0, 0, zoom, 0, 0);
 
       // starfield
       ctx.fillStyle = "#1a1a3a";
       const startX = Math.floor(camX / 40) * 40;
       const startY = Math.floor(camY / 40) * 40;
-      for (let x = startX; x < camX + viewW; x += 40) {
-        for (let y = startY; y < camY + viewH; y += 40) {
+      for (let x = startX; x < camX + wViewW; x += 40) {
+        for (let y = startY; y < camY + wViewH; y += 40) {
           const hx = ((x * 73856093) ^ (y * 19349663)) >>> 0;
           if (hx % 7 === 0) ctx.fillRect(x - camX, y - camY, 2, 2);
         }
