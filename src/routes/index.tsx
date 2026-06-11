@@ -565,11 +565,10 @@ function Game() {
       <canvas ref={canvasRef} className="block" />
       <div className="pointer-events-none absolute left-4 top-4 rounded-md bg-black/50 px-3 py-2 font-mono text-sm text-cyan-200 backdrop-blur">
         <div>SCORE: {hud.score}</div>
-        <div>LENGTH: {hud.length}</div>
-        <div>COINS: {hud.coins}</div>
+        <div>SEGMENTS (HP): {hud.length}</div>
         <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage} · RNG: {hud.fireRange}</div>
         <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Shift boost · P pause · R reset</div>
-        <div className="text-xs text-cyan-400/70">Find purple $ stations to upgrade</div>
+        <div className="text-xs text-cyan-400/70">Segments are your health AND your currency</div>
       </div>
 
       {isTouch && (
