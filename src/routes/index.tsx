@@ -95,6 +95,8 @@ function initialState() {
     hunterTimer: 0, // ms accumulator for hunter movement
     paused: false,
     shopOpen: false,
+    boost: false,
+    manualPause: false,
   };
 }
 
@@ -112,9 +114,25 @@ function Game() {
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
 
+  // Touch detection (for showing virtual D-pad)
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsTouch(mq.matches || "ontouchstart" in window);
+    update();
+    mq.addEventListener?.("change", update);
+    const onTouch = () => setIsTouch(true);
+    window.addEventListener("touchstart", onTouch, { once: true, passive: true });
+    return () => {
+      mq.removeEventListener?.("change", update);
+      window.removeEventListener("touchstart", onTouch);
+    };
+  }, []);
+
   // Input
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       if (e.key === "r" || e.key === "R") {
         reset();
         return;
@@ -123,14 +141,38 @@ function Game() {
         closeShop();
         return;
       }
+      if (e.key === " ") {
+        e.preventDefault();
+        manualFire();
+        return;
+      }
+      if (e.key === "Shift") {
+        stateRef.current.boost = true;
+        return;
+      }
+      if (e.key === "p" || e.key === "P") {
+        const s = stateRef.current;
+        if (!s.shopOpen) {
+          s.manualPause = !s.manualPause;
+          s.paused = s.manualPause;
+        }
+        return;
+      }
       const d = DIRS[e.key];
       if (!d) return;
       const cur = stateRef.current.dir;
       if (d.x === -cur.x && d.y === -cur.y) return;
       stateRef.current.nextDir = d;
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") stateRef.current.boost = false;
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
 
   useEffect(() => {
@@ -157,6 +199,13 @@ function Game() {
     s.paused = false;
     s.shopOpen = false;
     setShop({ open: false, checkpoint: null });
+  }
+
+  function manualFire() {
+    const s = stateRef.current;
+    if (!s.alive || s.paused) return;
+    // force a shot on next realtime update by maxing the fire timer
+    s.fireTimer = s.fireIntervalMs;
   }
 
   function buyFireRate() {
@@ -372,9 +421,10 @@ function Game() {
       const dt = now - last;
       last = now;
       acc += dt;
-      while (acc >= TICK_MS) {
+      const tickMs = stateRef.current.boost ? TICK_MS / 2 : TICK_MS;
+      while (acc >= tickMs) {
         tick();
-        acc -= TICK_MS;
+        acc -= tickMs;
       }
       updateRealtime(dt);
       draw();
@@ -495,17 +545,21 @@ function Game() {
         <div>LENGTH: {hud.length}</div>
         <div>COINS: {hud.coins}</div>
         <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage}</div>
-        <div className="mt-1 text-xs text-cyan-400/70">Arrows / WASD / on-screen D-pad · R reset · Find purple $ to upgrade</div>
+        <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Space fire · Shift boost · P pause · R reset</div>
+        <div className="text-xs text-cyan-400/70">Find purple $ stations to upgrade</div>
       </div>
 
-      <OnScreenDpad
-        onDir={(d) => {
-          const cur = stateRef.current.dir;
-          if (d.x === -cur.x && d.y === -cur.y) return;
-          stateRef.current.nextDir = d;
-        }}
-        onReset={reset}
-      />
+      {isTouch && (
+        <OnScreenDpad
+          onDir={(d) => {
+            const cur = stateRef.current.dir;
+            if (d.x === -cur.x && d.y === -cur.y) return;
+            stateRef.current.nextDir = d;
+          }}
+          onReset={reset}
+          onFire={manualFire}
+        />
+      )}
 
       {shop.open && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
@@ -559,31 +613,53 @@ function Game() {
   );
 }
 
-function OnScreenDpad({ onDir, onReset }: { onDir: (d: Dir) => void; onReset: () => void }) {
+function OnScreenDpad({
+  onDir,
+  onReset,
+  onFire,
+}: {
+  onDir: (d: Dir) => void;
+  onReset: () => void;
+  onFire: () => void;
+}) {
   const btn =
-    "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md border border-cyan-500/40 bg-black/50 font-mono text-lg text-cyan-200 backdrop-blur hover:bg-cyan-500/20 active:bg-cyan-500/40 select-none";
+    "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md border border-cyan-500/40 bg-black/50 font-mono text-lg text-cyan-200 backdrop-blur active:bg-cyan-500/40 select-none touch-none";
   const press = (d: Dir) => (e: React.PointerEvent) => {
     e.preventDefault();
     onDir(d);
   };
   return (
-    <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
-      <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
-      <div className="flex gap-1">
-        <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
-        <button
-          className={btn + " text-xs"}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onReset();
-          }}
-          aria-label="Reset"
-        >
-          R
-        </button>
-        <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
+    <>
+      <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
+        <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
+        <div className="flex gap-1">
+          <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
+          <button
+            className={btn + " text-xs"}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              onReset();
+            }}
+            aria-label="Reset"
+          >
+            R
+          </button>
+          <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
+        </div>
+        <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
       </div>
-      <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
-    </div>
+      <button
+        className={
+          "pointer-events-auto absolute bottom-16 left-6 flex h-16 w-16 items-center justify-center rounded-full border border-yellow-400/50 bg-black/50 font-mono text-sm text-yellow-200 backdrop-blur active:bg-yellow-500/40 select-none touch-none"
+        }
+        onPointerDown={(e) => {
+          e.preventDefault();
+          onFire();
+        }}
+        aria-label="Fire"
+      >
+        FIRE
+      </button>
+    </>
   );
 }
