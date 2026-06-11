@@ -403,7 +403,7 @@ function Game() {
             e.hp -= s.damage;
             if (e.hp <= 0) {
               s.score += e.big ? 25 : 10;
-              s.coins += e.big ? 3 : 1;
+              
               s.enemies.splice(i, 1);
               const big = Math.random() < BIG_ENEMY_RATIO;
               s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
