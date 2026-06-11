@@ -198,12 +198,6 @@ function Game() {
     setShop({ open: false, checkpoint: null });
   }
 
-  function manualFire() {
-    const s = stateRef.current;
-    if (!s.alive || s.paused) return;
-    // force a shot on next realtime update by maxing the fire timer
-    s.fireTimer = s.fireIntervalMs;
-  }
 
   function buyFireRate() {
     const s = stateRef.current;
