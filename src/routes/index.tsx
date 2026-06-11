@@ -495,8 +495,17 @@ function Game() {
         <div>LENGTH: {hud.length}</div>
         <div>COINS: {hud.coins}</div>
         <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage}</div>
-        <div className="mt-1 text-xs text-cyan-400/70">Arrows / WASD · R reset · Find purple $ to upgrade</div>
+        <div className="mt-1 text-xs text-cyan-400/70">Arrows / WASD / on-screen D-pad · R reset · Find purple $ to upgrade</div>
       </div>
+
+      <OnScreenDpad
+        onDir={(d) => {
+          const cur = stateRef.current.dir;
+          if (d.x === -cur.x && d.y === -cur.y) return;
+          stateRef.current.nextDir = d;
+        }}
+        onReset={reset}
+      />
 
       {shop.open && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
