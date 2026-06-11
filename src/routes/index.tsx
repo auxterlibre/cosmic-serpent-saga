@@ -495,8 +495,17 @@ function Game() {
         <div>LENGTH: {hud.length}</div>
         <div>COINS: {hud.coins}</div>
         <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage}</div>
-        <div className="mt-1 text-xs text-cyan-400/70">Arrows / WASD · R reset · Find purple $ to upgrade</div>
+        <div className="mt-1 text-xs text-cyan-400/70">Arrows / WASD / on-screen D-pad · R reset · Find purple $ to upgrade</div>
       </div>
+
+      <OnScreenDpad
+        onDir={(d) => {
+          const cur = stateRef.current.dir;
+          if (d.x === -cur.x && d.y === -cur.y) return;
+          stateRef.current.nextDir = d;
+        }}
+        onReset={reset}
+      />
 
       {shop.open && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
@@ -546,6 +555,35 @@ function Game() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function OnScreenDpad({ onDir, onReset }: { onDir: (d: Dir) => void; onReset: () => void }) {
+  const btn =
+    "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md border border-cyan-500/40 bg-black/50 font-mono text-lg text-cyan-200 backdrop-blur hover:bg-cyan-500/20 active:bg-cyan-500/40 select-none";
+  const press = (d: Dir) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    onDir(d);
+  };
+  return (
+    <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
+      <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
+      <div className="flex gap-1">
+        <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
+        <button
+          className={btn + " text-xs"}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            onReset();
+          }}
+          aria-label="Reset"
+        >
+          R
+        </button>
+        <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
+      </div>
+      <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
     </div>
   );
 }
