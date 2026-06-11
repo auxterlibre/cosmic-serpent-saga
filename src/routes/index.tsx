@@ -16,10 +16,10 @@ const CELL = 20;
 const WORLD_W = 100;
 const WORLD_H = 100;
 const TICK_MS = 90;
-const LOOT_COUNT = 30; // scattered less
+const LOOT_COUNT = 30;
 const ENEMY_COUNT = 25;
-const BIG_ENEMY_RATIO = 0.3; // ~30% are big (2 segments removed, 2 hits to kill)
-const HUNTER_COUNT = 8; // triangle hunters
+const BIG_ENEMY_RATIO = 0.3;
+const HUNTER_COUNT = 8;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
@@ -61,13 +61,9 @@ function makeHunters(): Hunter[] {
   return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), cooldown: 0 }));
 }
 function makeCheckpoints(): Checkpoint[] {
-  // spread roughly across the map
   const cps: Checkpoint[] = [];
   for (let i = 0; i < CHECKPOINT_COUNT; i++) {
-    cps.push({
-      x: 10 + rand(WORLD_W - 20),
-      y: 10 + rand(WORLD_H - 20),
-    });
+    cps.push({ x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) });
   }
   return cps;
 }
@@ -88,12 +84,11 @@ function initialState() {
     projectiles: [] as Projectile[],
     alive: true,
     score: 0,
-    
     fireIntervalMs: 2000,
     damage: 1,
-    fireRange: 8, // in cells
-    fireTimer: 0, // ms since last shot
-    hunterTimer: 0, // ms accumulator for hunter movement
+    fireRange: 8,
+    fireTimer: 0,
+    hunterTimer: 0,
     paused: false,
     shopOpen: false,
     boost: false,
@@ -115,7 +110,7 @@ function Game() {
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
 
-  // Touch detection (for showing virtual D-pad)
+  // Touch detection
   const [isTouch, setIsTouch] = useState(false);
   useEffect(() => {
     const mq = window.matchMedia("(pointer: coarse)");
@@ -134,24 +129,12 @@ function Game() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      if (e.key === "r" || e.key === "R") {
-        reset();
-        return;
-      }
-      if (e.key === "Escape") {
-        closeShop();
-        return;
-      }
-      if (e.key === "Shift") {
-        stateRef.current.boost = true;
-        return;
-      }
+      if (e.key === "r" || e.key === "R") { reset(); return; }
+      if (e.key === "Escape") { closeShop(); return; }
+      if (e.key === "Shift") { stateRef.current.boost = true; return; }
       if (e.key === "p" || e.key === "P") {
         const s = stateRef.current;
-        if (!s.shopOpen) {
-          s.manualPause = !s.manualPause;
-          s.paused = s.manualPause;
-        }
+        if (!s.shopOpen) { s.manualPause = !s.manualPause; s.paused = s.manualPause; }
         return;
       }
       const d = DIRS[e.key];
@@ -165,12 +148,10 @@ function Game() {
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKeyUp);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("keyup", onKeyUp);
-    };
+    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); };
   }, []);
 
+  // Resize
   useEffect(() => {
     const onResize = () => {
       const c = canvasRef.current;
@@ -197,10 +178,8 @@ function Game() {
     setShop({ open: false, checkpoint: null });
   }
 
-
   function spendSegments(cost: number): boolean {
     const s = stateRef.current;
-    // must keep at least 1 segment (head)
     if (s.snake.length - cost < 1) return false;
     for (let i = 0; i < cost; i++) s.snake.pop();
     return true;
@@ -208,23 +187,20 @@ function Game() {
 
   function buyFireRate() {
     const s = stateRef.current;
-    const cost = 2;
     if (s.fireIntervalMs <= 300) return;
-    if (!spendSegments(cost)) return;
+    if (!spendSegments(2)) return;
     s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8));
     syncHud();
   }
   function buyDamage() {
-    const cost = 3;
-    if (!spendSegments(cost)) return;
+    if (!spendSegments(3)) return;
     stateRef.current.damage += 1;
     syncHud();
   }
   function buyRange() {
     const s = stateRef.current;
-    const cost = 2;
     if (s.fireRange >= 30) return;
-    if (!spendSegments(cost)) return;
+    if (!spendSegments(2)) return;
     s.fireRange += 2;
     syncHud();
   }
@@ -240,7 +216,6 @@ function Game() {
     });
   }
 
-
   // Game loop
   useEffect(() => {
     let raf = 0;
@@ -255,16 +230,9 @@ function Game() {
       const nx = head.x + s.dir.x;
       const ny = head.y + s.dir.y;
 
-      if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) {
-        s.alive = false;
-        syncHud();
-        return;
-      }
-      if (s.snake.some((seg) => seg.x === nx && seg.y === ny)) {
-        s.alive = false;
-        syncHud();
-        return;
-      }
+      if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) { s.alive = false; syncHud(); return; }
+      if (s.snake.some((seg) => seg.x === nx && seg.y === ny)) { s.alive = false; syncHud(); return; }
+
       const newHead = { x: nx, y: ny };
       s.snake.unshift(newHead);
 
@@ -275,7 +243,6 @@ function Game() {
         s.loot.splice(lootIdx, 1);
         s.loot.push(randPos());
         s.score += 10;
-        
         grew = true;
       }
 
@@ -314,7 +281,7 @@ function Game() {
       const s = stateRef.current;
       if (!s.alive || s.paused) return;
 
-      // Hunters move toward head every ~250ms
+      // Hunters move toward head
       s.hunterTimer += dt;
       const HUNTER_STEP_MS = 220;
       while (s.hunterTimer >= HUNTER_STEP_MS) {
@@ -328,30 +295,26 @@ function Game() {
           else if (dy !== 0) h.y += Math.sign(dy);
           else if (dx !== 0) h.x += Math.sign(dx);
 
-          // contact with any segment -> remove that segment area
           const hitIdx = s.snake.findIndex((seg) => seg.x === h.x && seg.y === h.y);
           if (hitIdx >= 0) {
-            // remove one segment (prefer tail end for stability if head hit -> death)
             if (hitIdx === 0) {
               s.alive = false;
             } else {
               s.snake.pop();
               if (s.snake.length === 0) s.alive = false;
             }
-            // bounce hunter away one step
             h.x -= Math.sign(dx || 1);
           }
         }
       }
 
-      // Firing
+      // Auto-fire
       s.fireTimer += dt;
       if (s.fireTimer >= s.fireIntervalMs) {
         const head = s.snake[0];
         if (head) {
           const rangeSq = s.fireRange * s.fireRange;
-          const PROJ_SPEED = 45; // cells/sec
-          // closest target within range among enemies + hunters, with lead prediction
+          const PROJ_SPEED = 45;
           type T = { x: number; y: number; d2: number };
           let best: T | null = null;
           const consider = (cx: number, cy: number, vx = 0, vy = 0) => {
@@ -359,7 +322,6 @@ function Game() {
             const dy = cy - (head.y + 0.5);
             const d2 = dx * dx + dy * dy;
             if (d2 > rangeSq) return;
-            // simple lead: time to reach current pos, predict ahead by that time
             const t = Math.sqrt(d2) / PROJ_SPEED;
             const px = cx + vx * t;
             const py = cy + vy * t;
@@ -370,7 +332,6 @@ function Game() {
             consider(e.x + size / 2, e.y + size / 2);
           }
           for (const h of s.hunters) {
-            // estimate hunter velocity from direction toward head (cells/sec); they step ~1 cell / 0.22s
             const dx = head.x - h.x;
             const dy = head.y - h.y;
             const sx = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
@@ -398,9 +359,9 @@ function Game() {
         }
       }
 
-      // projectiles: substep to avoid tunneling
+      // Projectile substeps
       const dtSec = dt / 1000;
-      const HIT_R = 0.6; // hit radius in cells
+      const HIT_R = 0.6;
       s.projectiles = s.projectiles.filter((p) => {
         const steps = Math.max(1, Math.ceil((Math.hypot(p.vx, p.vy) * dtSec) / 0.3));
         const stepDt = dtSec / steps;
@@ -408,7 +369,6 @@ function Game() {
           p.x += p.vx * stepDt;
           p.y += p.vy * stepDt;
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
-          // hit enemy (AABB with small padding)
           for (let i = 0; i < s.enemies.length; i++) {
             const e = s.enemies[i];
             const size = e.big ? 2 : 1;
@@ -423,7 +383,6 @@ function Game() {
               return false;
             }
           }
-          // hit hunter (circle around center)
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
             const dx = p.x - (h.x + 0.5);
@@ -437,8 +396,7 @@ function Game() {
           }
         }
         p.life -= dt;
-        if (p.life <= 0) return false;
-        return true;
+        return p.life > 0;
       });
     };
 
@@ -466,20 +424,29 @@ function Game() {
 
       const viewW = c.width;
       const viewH = c.height;
-      let camX = head.x * CELL + CELL / 2 - viewW / 2;
-      let camY = head.y * CELL + CELL / 2 - viewH / 2;
-      camX = Math.max(0, Math.min(WORLD_W * CELL - viewW, camX));
-      camY = Math.max(0, Math.min(WORLD_H * CELL - viewH, camY));
 
+      // Zoom out on portrait/narrow screens
+      const portrait = viewH > viewW;
+      const zoom = portrait ? Math.min(1, Math.max(0.45, viewW / 800)) : 1;
+      const wViewW = viewW / zoom;
+      const wViewH = viewH / zoom;
+
+      let camX = head.x * CELL + CELL / 2 - wViewW / 2;
+      let camY = head.y * CELL + CELL / 2 - wViewH / 2;
+      camX = Math.max(0, Math.min(WORLD_W * CELL - wViewW, camX));
+      camY = Math.max(0, Math.min(WORLD_H * CELL - wViewH, camY));
+
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = "#0a0a18";
       ctx.fillRect(0, 0, viewW, viewH);
+      ctx.setTransform(zoom, 0, 0, zoom, 0, 0);
 
       // starfield
       ctx.fillStyle = "#1a1a3a";
       const startX = Math.floor(camX / 40) * 40;
       const startY = Math.floor(camY / 40) * 40;
-      for (let x = startX; x < camX + viewW; x += 40) {
-        for (let y = startY; y < camY + viewH; y += 40) {
+      for (let x = startX; x < camX + wViewW; x += 40) {
+        for (let y = startY; y < camY + wViewH; y += 40) {
           const hx = ((x * 73856093) ^ (y * 19349663)) >>> 0;
           if (hx % 7 === 0) ctx.fillRect(x - camX, y - camY, 2, 2);
         }
@@ -489,11 +456,11 @@ function Game() {
       ctx.lineWidth = 2;
       ctx.strokeRect(-camX, -camY, WORLD_W * CELL, WORLD_H * CELL);
 
-      // checkpoints (purple stations)
+      // checkpoints
       for (const cp of s.checkpoints) {
         const px = cp.x * CELL - camX;
         const py = cp.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > viewW || py > viewH) continue;
+        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
         ctx.fillStyle = "#a855f7";
         ctx.fillRect(px, py, CELL, CELL);
         ctx.strokeStyle = "#f0abfc";
@@ -509,16 +476,16 @@ function Game() {
       for (const l of s.loot) {
         const px = l.x * CELL - camX;
         const py = l.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > viewW || py > viewH) continue;
+        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
       }
 
-      // enemies (squares, some big)
+      // enemies
       for (const e of s.enemies) {
         const size = e.big ? 2 : 1;
         const px = e.x * CELL - camX;
         const py = e.y * CELL - camY;
-        if (px < -CELL * 2 || py < -CELL * 2 || px > viewW || py > viewH) continue;
+        if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
         ctx.fillStyle = e.big ? "#b91c1c" : "#e0455e";
         ctx.fillRect(px + 2, py + 2, size * CELL - 4, size * CELL - 4);
         if (e.big && e.hp < 2) {
@@ -532,7 +499,7 @@ function Game() {
       for (const h of s.hunters) {
         const px = h.x * CELL - camX;
         const py = h.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > viewW || py > viewH) continue;
+        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
         ctx.beginPath();
         ctx.moveTo(px + CELL / 2, py + 2);
         ctx.lineTo(px + CELL - 2, py + CELL - 2);
@@ -557,7 +524,7 @@ function Game() {
         ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
       });
 
-      // fire range indicator around head
+      // fire range indicator
       if (s.snake[0]) {
         const hx = s.snake[0].x * CELL + CELL / 2 - camX;
         const hy = s.snake[0].y * CELL + CELL / 2 - camY;
@@ -601,7 +568,7 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <div className="w-[360px] rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend segments to upgrade your weapon. Segments are your hit points — don't drop to 0.</div>
+            <div className="mt-1 text-xs opacity-70">Spend segments to upgrade. Segments = health — don't drop to 0!</div>
             <div className="mt-4 text-sm">Segments: <span className="text-cyan-300">{hud.length}</span></div>
             <div className="mt-4 space-y-2">
               <button
@@ -677,10 +644,7 @@ function OnScreenDpad({
         <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
         <button
           className={btn + " text-xs"}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            onReset();
-          }}
+          onPointerDown={(e) => { e.preventDefault(); onReset(); }}
           aria-label="Reset"
         >
           R
