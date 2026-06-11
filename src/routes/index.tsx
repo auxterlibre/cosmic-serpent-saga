@@ -355,33 +355,39 @@ function Game() {
       // Firing
       s.fireTimer += dt;
       if (s.fireTimer >= s.fireIntervalMs) {
-        s.fireTimer = 0;
         const head = s.snake[0];
         if (head) {
-          // closest target among enemies + hunters
+          const rangeSq = s.fireRange * s.fireRange;
+          // closest target within range among enemies + hunters
           type T = { x: number; y: number; d2: number };
           let best: T | null = null;
           const consider = (x: number, y: number) => {
             const dx = x - head.x;
             const dy = y - head.y;
             const d2 = dx * dx + dy * dy;
+            if (d2 > rangeSq) return;
             if (!best || d2 < best.d2) best = { x, y, d2 };
           };
           for (const e of s.enemies) consider(e.x + (e.big ? 0.5 : 0), e.y + (e.big ? 0.5 : 0));
           for (const h of s.hunters) consider(h.x, h.y);
           if (best) {
+            s.fireTimer = 0;
             const b: T = best;
             const dx = b.x - head.x;
             const dy = b.y - head.y;
             const len = Math.hypot(dx, dy) || 1;
             const speed = 25; // cells/sec
+            const lifeMs = ((s.fireRange + 1) / speed) * 1000;
             s.projectiles.push({
               x: head.x + 0.5,
               y: head.y + 0.5,
               vx: (dx / len) * speed,
               vy: (dy / len) * speed,
-              life: 2000,
+              life: lifeMs,
             });
+          } else {
+            // no target in range; cap timer so we don't spam-check forever
+            s.fireTimer = s.fireIntervalMs;
           }
         }
       }
