@@ -143,11 +143,6 @@ function Game() {
         closeShop();
         return;
       }
-      if (e.key === " ") {
-        e.preventDefault();
-        manualFire();
-        return;
-      }
       if (e.key === "Shift") {
         stateRef.current.boost = true;
         return;
