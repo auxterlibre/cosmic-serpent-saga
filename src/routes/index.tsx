@@ -109,7 +109,6 @@ function Game() {
     score: 0,
     length: 3,
     alive: true,
-    coins: 0,
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
