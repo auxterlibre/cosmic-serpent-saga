@@ -350,79 +350,94 @@ function Game() {
         const head = s.snake[0];
         if (head) {
           const rangeSq = s.fireRange * s.fireRange;
-          // closest target within range among enemies + hunters
+          const PROJ_SPEED = 45; // cells/sec
+          // closest target within range among enemies + hunters, with lead prediction
           type T = { x: number; y: number; d2: number };
           let best: T | null = null;
-          const consider = (x: number, y: number) => {
-            const dx = x - head.x;
-            const dy = y - head.y;
+          const consider = (cx: number, cy: number, vx = 0, vy = 0) => {
+            const dx = cx - (head.x + 0.5);
+            const dy = cy - (head.y + 0.5);
             const d2 = dx * dx + dy * dy;
             if (d2 > rangeSq) return;
-            if (!best || d2 < best.d2) best = { x, y, d2 };
+            // simple lead: time to reach current pos, predict ahead by that time
+            const t = Math.sqrt(d2) / PROJ_SPEED;
+            const px = cx + vx * t;
+            const py = cy + vy * t;
+            if (!best || d2 < best.d2) best = { x: px, y: py, d2 };
           };
-          for (const e of s.enemies) consider(e.x + (e.big ? 0.5 : 0), e.y + (e.big ? 0.5 : 0));
-          for (const h of s.hunters) consider(h.x, h.y);
+          for (const e of s.enemies) {
+            const size = e.big ? 2 : 1;
+            consider(e.x + size / 2, e.y + size / 2);
+          }
+          for (const h of s.hunters) {
+            // estimate hunter velocity from direction toward head (cells/sec); they step ~1 cell / 0.22s
+            const dx = head.x - h.x;
+            const dy = head.y - h.y;
+            const sx = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
+            const sy = Math.abs(dy) > Math.abs(dx) ? Math.sign(dy) : 0;
+            const hSpeed = 1 / 0.22;
+            consider(h.x + 0.5, h.y + 0.5, sx * hSpeed, sy * hSpeed);
+          }
           if (best) {
             s.fireTimer = 0;
             const b: T = best;
-            const dx = b.x - head.x;
-            const dy = b.y - head.y;
+            const dx = b.x - (head.x + 0.5);
+            const dy = b.y - (head.y + 0.5);
             const len = Math.hypot(dx, dy) || 1;
-            const speed = 25; // cells/sec
-            const lifeMs = ((s.fireRange + 1) / speed) * 1000;
+            const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
             s.projectiles.push({
               x: head.x + 0.5,
               y: head.y + 0.5,
-              vx: (dx / len) * speed,
-              vy: (dy / len) * speed,
+              vx: (dx / len) * PROJ_SPEED,
+              vy: (dy / len) * PROJ_SPEED,
               life: lifeMs,
             });
           } else {
-            // no target in range; cap timer so we don't spam-check forever
             s.fireTimer = s.fireIntervalMs;
           }
         }
       }
 
-      // projectiles move
+      // projectiles: substep to avoid tunneling
       const dtSec = dt / 1000;
-      for (const p of s.projectiles) {
-        p.x += p.vx * dtSec;
-        p.y += p.vy * dtSec;
-        p.life -= dt;
-      }
-      // collide projectiles
+      const HIT_R = 0.6; // hit radius in cells
       s.projectiles = s.projectiles.filter((p) => {
-        if (p.life <= 0) return false;
-        if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
-        // hit enemy
-        for (let i = 0; i < s.enemies.length; i++) {
-          const e = s.enemies[i];
-          const size = e.big ? 2 : 1;
-          if (p.x >= e.x && p.x < e.x + size && p.y >= e.y && p.y < e.y + size) {
-            e.hp -= s.damage;
-            if (e.hp <= 0) {
-              s.score += e.big ? 25 : 10;
-              
-              s.enemies.splice(i, 1);
-              const big = Math.random() < BIG_ENEMY_RATIO;
-              s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
+        const steps = Math.max(1, Math.ceil((Math.hypot(p.vx, p.vy) * dtSec) / 0.3));
+        const stepDt = dtSec / steps;
+        for (let step = 0; step < steps; step++) {
+          p.x += p.vx * stepDt;
+          p.y += p.vy * stepDt;
+          if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
+          // hit enemy (AABB with small padding)
+          for (let i = 0; i < s.enemies.length; i++) {
+            const e = s.enemies[i];
+            const size = e.big ? 2 : 1;
+            if (p.x >= e.x - 0.1 && p.x < e.x + size + 0.1 && p.y >= e.y - 0.1 && p.y < e.y + size + 0.1) {
+              e.hp -= s.damage;
+              if (e.hp <= 0) {
+                s.score += e.big ? 25 : 10;
+                s.enemies.splice(i, 1);
+                const big = Math.random() < BIG_ENEMY_RATIO;
+                s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
+              }
+              return false;
             }
-            return false;
+          }
+          // hit hunter (circle around center)
+          for (let i = 0; i < s.hunters.length; i++) {
+            const h = s.hunters[i];
+            const dx = p.x - (h.x + 0.5);
+            const dy = p.y - (h.y + 0.5);
+            if (dx * dx + dy * dy <= HIT_R * HIT_R) {
+              s.score += 15;
+              s.hunters.splice(i, 1);
+              s.hunters.push({ ...randPos(), cooldown: 0 });
+              return false;
+            }
           }
         }
-        // hit hunter
-        for (let i = 0; i < s.hunters.length; i++) {
-          const h = s.hunters[i];
-          if (Math.floor(p.x) === h.x && Math.floor(p.y) === h.y) {
-            s.score += 15;
-            
-            s.hunters.splice(i, 1);
-            // respawn at edge far from player
-            s.hunters.push({ ...randPos(), cooldown: 0 });
-            return false;
-          }
-        }
+        p.life -= dt;
+        if (p.life <= 0) return false;
         return true;
       });
     };
