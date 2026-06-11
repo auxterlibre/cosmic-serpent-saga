@@ -227,6 +227,15 @@ function Game() {
     s.damage += 1;
     syncHud();
   }
+  function buyRange() {
+    const s = stateRef.current;
+    const cost = 6;
+    if (s.coins < cost) return;
+    if (s.fireRange >= 30) return;
+    s.coins -= cost;
+    s.fireRange += 2;
+    syncHud();
+  }
   function syncHud() {
     const s = stateRef.current;
     setHud({
@@ -236,6 +245,7 @@ function Game() {
       coins: s.coins,
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
+      fireRange: s.fireRange,
     });
   }
 
