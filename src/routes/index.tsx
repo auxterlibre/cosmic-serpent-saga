@@ -551,8 +551,8 @@ function Game() {
         <div>SCORE: {hud.score}</div>
         <div>LENGTH: {hud.length}</div>
         <div>COINS: {hud.coins}</div>
-        <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage}</div>
-        <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Space fire · Shift boost · P pause · R reset</div>
+        <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage} · RNG: {hud.fireRange}</div>
+        <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Shift boost · P pause · R reset</div>
         <div className="text-xs text-cyan-400/70">Find purple $ stations to upgrade</div>
       </div>
 
@@ -564,7 +564,6 @@ function Game() {
             stateRef.current.nextDir = d;
           }}
           onReset={reset}
-          onFire={manualFire}
         />
       )}
 
