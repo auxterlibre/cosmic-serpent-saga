@@ -199,29 +199,33 @@ function Game() {
   }
 
 
+  function spendSegments(cost: number): boolean {
+    const s = stateRef.current;
+    // must keep at least 1 segment (head)
+    if (s.snake.length - cost < 1) return false;
+    for (let i = 0; i < cost; i++) s.snake.pop();
+    return true;
+  }
+
   function buyFireRate() {
     const s = stateRef.current;
-    const cost = 5;
-    if (s.coins < cost) return;
+    const cost = 2;
     if (s.fireIntervalMs <= 300) return;
-    s.coins -= cost;
+    if (!spendSegments(cost)) return;
     s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8));
     syncHud();
   }
   function buyDamage() {
-    const s = stateRef.current;
-    const cost = 8;
-    if (s.coins < cost) return;
-    s.coins -= cost;
-    s.damage += 1;
+    const cost = 3;
+    if (!spendSegments(cost)) return;
+    stateRef.current.damage += 1;
     syncHud();
   }
   function buyRange() {
     const s = stateRef.current;
-    const cost = 6;
-    if (s.coins < cost) return;
+    const cost = 2;
     if (s.fireRange >= 30) return;
-    s.coins -= cost;
+    if (!spendSegments(cost)) return;
     s.fireRange += 2;
     syncHud();
   }
@@ -231,12 +235,12 @@ function Game() {
       score: s.score,
       length: s.snake.length,
       alive: s.alive,
-      coins: s.coins,
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
       fireRange: s.fireRange,
     });
   }
+
 
   // Game loop
   useEffect(() => {
