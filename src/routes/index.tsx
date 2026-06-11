@@ -586,31 +586,31 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <div className="w-[360px] rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Upgrade your weapon</div>
-            <div className="mt-4 text-sm">Coins: <span className="text-yellow-300">{hud.coins}</span></div>
+            <div className="mt-1 text-xs opacity-70">Spend segments to upgrade your weapon. Segments are your hit points — don't drop to 0.</div>
+            <div className="mt-4 text-sm">Segments: <span className="text-cyan-300">{hud.length}</span></div>
             <div className="mt-4 space-y-2">
               <button
                 onClick={buyFireRate}
-                disabled={hud.coins < 5 || hud.fireIntervalMs <= 300}
+                disabled={hud.length <= 2 || hud.fireIntervalMs <= 300}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Fire rate +20% — 5 coins
+                Fire rate +20% — 2 segments
                 <div className="text-xs opacity-60">Current: {(hud.fireIntervalMs / 1000).toFixed(2)}s</div>
               </button>
               <button
                 onClick={buyDamage}
-                disabled={hud.coins < 8}
+                disabled={hud.length <= 3}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Damage +1 — 8 coins
+                Damage +1 — 3 segments
                 <div className="text-xs opacity-60">Current: {hud.damage}</div>
               </button>
               <button
                 onClick={buyRange}
-                disabled={hud.coins < 6 || hud.fireRange >= 30}
+                disabled={hud.length <= 2 || hud.fireRange >= 30}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Range +2 — 6 coins
+                Range +2 — 2 segments
                 <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
               </button>
             </div>
