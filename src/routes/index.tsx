@@ -91,6 +91,7 @@ function initialState() {
     coins: 0,
     fireIntervalMs: 2000,
     damage: 1,
+    fireRange: 8, // in cells
     fireTimer: 0, // ms since last shot
     hunterTimer: 0, // ms accumulator for hunter movement
     paused: false,
