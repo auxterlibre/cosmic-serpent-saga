@@ -95,6 +95,8 @@ function initialState() {
     hunterTimer: 0, // ms accumulator for hunter movement
     paused: false,
     shopOpen: false,
+    boost: false,
+    manualPause: false,
   };
 }
 
