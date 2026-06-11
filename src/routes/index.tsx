@@ -88,7 +88,7 @@ function initialState() {
     projectiles: [] as Projectile[],
     alive: true,
     score: 0,
-    coins: 0,
+    
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8, // in cells
