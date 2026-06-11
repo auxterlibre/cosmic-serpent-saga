@@ -590,6 +590,14 @@ function Game() {
                 Damage +1 — 8 coins
                 <div className="text-xs opacity-60">Current: {hud.damage}</div>
               </button>
+              <button
+                onClick={buyRange}
+                disabled={hud.coins < 6 || hud.fireRange >= 30}
+                className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
+              >
+                Range +2 — 6 coins
+                <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
+              </button>
             </div>
             <button
               onClick={closeShop}
