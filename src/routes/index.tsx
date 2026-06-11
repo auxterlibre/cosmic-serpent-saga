@@ -88,7 +88,7 @@ function initialState() {
     projectiles: [] as Projectile[],
     alive: true,
     score: 0,
-    coins: 0,
+    
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8, // in cells
@@ -109,7 +109,6 @@ function Game() {
     score: 0,
     length: 3,
     alive: true,
-    coins: 0,
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
@@ -187,7 +186,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 3, alive: true, coins: 0, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
+    setHud({ score: 0, length: 3, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
     setShop({ open: false, checkpoint: null });
   }
 
@@ -199,29 +198,33 @@ function Game() {
   }
 
 
+  function spendSegments(cost: number): boolean {
+    const s = stateRef.current;
+    // must keep at least 1 segment (head)
+    if (s.snake.length - cost < 1) return false;
+    for (let i = 0; i < cost; i++) s.snake.pop();
+    return true;
+  }
+
   function buyFireRate() {
     const s = stateRef.current;
-    const cost = 5;
-    if (s.coins < cost) return;
+    const cost = 2;
     if (s.fireIntervalMs <= 300) return;
-    s.coins -= cost;
+    if (!spendSegments(cost)) return;
     s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8));
     syncHud();
   }
   function buyDamage() {
-    const s = stateRef.current;
-    const cost = 8;
-    if (s.coins < cost) return;
-    s.coins -= cost;
-    s.damage += 1;
+    const cost = 3;
+    if (!spendSegments(cost)) return;
+    stateRef.current.damage += 1;
     syncHud();
   }
   function buyRange() {
     const s = stateRef.current;
-    const cost = 6;
-    if (s.coins < cost) return;
+    const cost = 2;
     if (s.fireRange >= 30) return;
-    s.coins -= cost;
+    if (!spendSegments(cost)) return;
     s.fireRange += 2;
     syncHud();
   }
@@ -231,12 +234,12 @@ function Game() {
       score: s.score,
       length: s.snake.length,
       alive: s.alive,
-      coins: s.coins,
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
       fireRange: s.fireRange,
     });
   }
+
 
   // Game loop
   useEffect(() => {
@@ -272,7 +275,7 @@ function Game() {
         s.loot.splice(lootIdx, 1);
         s.loot.push(randPos());
         s.score += 10;
-        s.coins += 1;
+        
         grew = true;
       }
 
@@ -400,7 +403,7 @@ function Game() {
             e.hp -= s.damage;
             if (e.hp <= 0) {
               s.score += e.big ? 25 : 10;
-              s.coins += e.big ? 3 : 1;
+              
               s.enemies.splice(i, 1);
               const big = Math.random() < BIG_ENEMY_RATIO;
               s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
@@ -413,7 +416,7 @@ function Game() {
           const h = s.hunters[i];
           if (Math.floor(p.x) === h.x && Math.floor(p.y) === h.y) {
             s.score += 15;
-            s.coins += 2;
+            
             s.hunters.splice(i, 1);
             // respawn at edge far from player
             s.hunters.push({ ...randPos(), cooldown: 0 });
@@ -562,11 +565,10 @@ function Game() {
       <canvas ref={canvasRef} className="block" />
       <div className="pointer-events-none absolute left-4 top-4 rounded-md bg-black/50 px-3 py-2 font-mono text-sm text-cyan-200 backdrop-blur">
         <div>SCORE: {hud.score}</div>
-        <div>LENGTH: {hud.length}</div>
-        <div>COINS: {hud.coins}</div>
+        <div>SEGMENTS (HP): {hud.length}</div>
         <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage} · RNG: {hud.fireRange}</div>
         <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Shift boost · P pause · R reset</div>
-        <div className="text-xs text-cyan-400/70">Find purple $ stations to upgrade</div>
+        <div className="text-xs text-cyan-400/70">Segments are your health AND your currency</div>
       </div>
 
       {isTouch && (
@@ -584,31 +586,31 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <div className="w-[360px] rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Upgrade your weapon</div>
-            <div className="mt-4 text-sm">Coins: <span className="text-yellow-300">{hud.coins}</span></div>
+            <div className="mt-1 text-xs opacity-70">Spend segments to upgrade your weapon. Segments are your hit points — don't drop to 0.</div>
+            <div className="mt-4 text-sm">Segments: <span className="text-cyan-300">{hud.length}</span></div>
             <div className="mt-4 space-y-2">
               <button
                 onClick={buyFireRate}
-                disabled={hud.coins < 5 || hud.fireIntervalMs <= 300}
+                disabled={hud.length <= 2 || hud.fireIntervalMs <= 300}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Fire rate +20% — 5 coins
+                Fire rate +20% — 2 segments
                 <div className="text-xs opacity-60">Current: {(hud.fireIntervalMs / 1000).toFixed(2)}s</div>
               </button>
               <button
                 onClick={buyDamage}
-                disabled={hud.coins < 8}
+                disabled={hud.length <= 3}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Damage +1 — 8 coins
+                Damage +1 — 3 segments
                 <div className="text-xs opacity-60">Current: {hud.damage}</div>
               </button>
               <button
                 onClick={buyRange}
-                disabled={hud.coins < 6 || hud.fireRange >= 30}
+                disabled={hud.length <= 2 || hud.fireRange >= 30}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Range +2 — 6 coins
+                Range +2 — 2 segments
                 <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
               </button>
             </div>
