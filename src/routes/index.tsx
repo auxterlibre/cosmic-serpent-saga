@@ -558,3 +558,32 @@ function Game() {
     </div>
   );
 }
+
+function OnScreenDpad({ onDir, onReset }: { onDir: (d: Dir) => void; onReset: () => void }) {
+  const btn =
+    "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md border border-cyan-500/40 bg-black/50 font-mono text-lg text-cyan-200 backdrop-blur hover:bg-cyan-500/20 active:bg-cyan-500/40 select-none";
+  const press = (d: Dir) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    onDir(d);
+  };
+  return (
+    <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
+      <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
+      <div className="flex gap-1">
+        <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
+        <button
+          className={btn + " text-xs"}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            onReset();
+          }}
+          aria-label="Reset"
+        >
+          R
+        </button>
+        <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
+      </div>
+      <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
+    </div>
+  );
+}
