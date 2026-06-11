@@ -114,9 +114,25 @@ function Game() {
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
 
+  // Touch detection (for showing virtual D-pad)
+  const [isTouch, setIsTouch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    const update = () => setIsTouch(mq.matches || "ontouchstart" in window);
+    update();
+    mq.addEventListener?.("change", update);
+    const onTouch = () => setIsTouch(true);
+    window.addEventListener("touchstart", onTouch, { once: true, passive: true });
+    return () => {
+      mq.removeEventListener?.("change", update);
+      window.removeEventListener("touchstart", onTouch);
+    };
+  }, []);
+
   // Input
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.repeat) return;
       if (e.key === "r" || e.key === "R") {
         reset();
         return;
@@ -125,14 +141,38 @@ function Game() {
         closeShop();
         return;
       }
+      if (e.key === " ") {
+        e.preventDefault();
+        manualFire();
+        return;
+      }
+      if (e.key === "Shift") {
+        stateRef.current.boost = true;
+        return;
+      }
+      if (e.key === "p" || e.key === "P") {
+        const s = stateRef.current;
+        if (!s.shopOpen) {
+          s.manualPause = !s.manualPause;
+          s.paused = s.manualPause;
+        }
+        return;
+      }
       const d = DIRS[e.key];
       if (!d) return;
       const cur = stateRef.current.dir;
       if (d.x === -cur.x && d.y === -cur.y) return;
       stateRef.current.nextDir = d;
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.key === "Shift") stateRef.current.boost = false;
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
 
   useEffect(() => {
