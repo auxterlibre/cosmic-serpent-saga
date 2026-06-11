@@ -538,6 +538,19 @@ function Game() {
         ctx.fillStyle = i === 0 ? "#7df9ff" : "#3aa8b8";
         ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
       });
+
+      // fire range indicator around head
+      if (s.snake[0]) {
+        const hx = s.snake[0].x * CELL + CELL / 2 - camX;
+        const hy = s.snake[0].y * CELL + CELL / 2 - camY;
+        ctx.strokeStyle = "rgba(125, 249, 255, 0.18)";
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(hx, hy, s.fireRange * CELL, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
     };
 
     raf = requestAnimationFrame(loop);
