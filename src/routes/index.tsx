@@ -312,41 +312,63 @@ function Game() {
       if (!s.alive || s.paused) return;
 
       {
-        const head = s.snake[0];
-        if (head) {
-          const dtSec = dt / 1000;
-          const step = HUNTER_SPEED * dtSec;
-          const hx = head.x + 0.5;
-          const hy = head.y + 0.5;
-          for (const h of s.hunters) {
-            const dx = hx - (h.x + 0.5);
-            const dy = hy - (h.y + 0.5);
-            const dist = Math.hypot(dx, dy);
-            if (dist > 0.01) {
-              const nx = dx / dist;
-              const ny = dy / dist;
-              const move = Math.min(step, dist);
-              h.x += nx * move;
-              h.y += ny * move;
-              const target = Math.atan2(ny, nx);
-              let diff = target - h.angle;
-              while (diff > Math.PI) diff -= Math.PI * 2;
-              while (diff < -Math.PI) diff += Math.PI * 2;
-              h.angle += diff * Math.min(1, dtSec * 8);
-            }
+        const dtSec = dt / 1000;
+        const step = HUNTER_SPEED * dtSec;
+        for (const h of s.hunters) {
+          if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
 
-            const cx = Math.floor(h.x + 0.5);
-            const cy = Math.floor(h.y + 0.5);
-            const hitIdx = s.snake.findIndex((seg) => seg.x === cx && seg.y === cy);
-            if (hitIdx >= 0) {
-              if (hitIdx === 0) {
-                s.alive = false;
-              } else {
-                s.snake.pop();
-                if (s.snake.length === 0) s.alive = false;
+          // Target nearest snake segment
+          let tx = 0, ty = 0, bestD = Infinity, targetIdx = -1;
+          for (let i = 0; i < s.snake.length; i++) {
+            const seg = s.snake[i];
+            const sx = seg.x + 0.5;
+            const sy = seg.y + 0.5;
+            const ddx = sx - (h.x + 0.5);
+            const ddy = sy - (h.y + 0.5);
+            const d = ddx * ddx + ddy * ddy;
+            if (d < bestD) { bestD = d; tx = sx; ty = sy; targetIdx = i; }
+          }
+          if (targetIdx < 0) continue;
+
+          const dx = tx - (h.x + 0.5);
+          const dy = ty - (h.y + 0.5);
+          const dist = Math.hypot(dx, dy);
+          if (dist > 0.01) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const move = Math.min(step, dist);
+            h.x += nx * move;
+            h.y += ny * move;
+            const target = Math.atan2(ny, nx);
+            let diff = target - h.angle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            h.angle += diff * Math.min(1, dtSec * 8);
+          }
+
+          // Assimilate the segment it touched
+          if (h.cooldown <= 0) {
+            const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
+            for (let i = 0; i < s.snake.length; i++) {
+              const seg = s.snake[i];
+              const ddx = (seg.x + 0.5) - (h.x + 0.5);
+              const ddy = (seg.y + 0.5) - (h.y + 0.5);
+              if (ddx * ddx + ddy * ddy <= (hsize + 0.4) * (hsize + 0.4)) {
+                if (i === 0) {
+                  s.alive = false;
+                  syncHud();
+                  return;
+                }
+                s.snake.splice(i, 1);
+                h.hp += 1;
+                h.cooldown = 600;
+                if (s.snake.length === 0) {
+                  s.alive = false;
+                  syncHud();
+                  return;
+                }
+                break;
               }
-              h.x -= (dx / (dist || 1)) * 0.6;
-              h.y -= (dy / (dist || 1)) * 0.6;
             }
           }
         }
