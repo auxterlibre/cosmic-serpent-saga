@@ -247,17 +247,17 @@ function Game() {
         grew = true;
       }
 
-      // enemy collision (squares)
-      const enemyIdx = s.enemies.findIndex(
-        (e) => nx >= e.x && nx <= e.x + (e.big ? 1 : 0) && ny >= e.y && ny <= e.y + (e.big ? 1 : 0),
+      // obstacle collision (squares) — damages the snake but isn't a target
+      const obIdx = s.obstacles.findIndex(
+        (o) => nx >= o.x && nx <= o.x + (o.big ? 1 : 0) && ny >= o.y && ny <= o.y + (o.big ? 1 : 0),
       );
       let shrink = 0;
-      if (enemyIdx >= 0) {
-        const e = s.enemies[enemyIdx];
-        shrink += e.big ? 2 : 1;
-        s.enemies.splice(enemyIdx, 1);
-        const big = Math.random() < BIG_ENEMY_RATIO;
-        s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
+      if (obIdx >= 0) {
+        const o = s.obstacles[obIdx];
+        shrink += o.big ? 2 : 1;
+        s.obstacles.splice(obIdx, 1);
+        const big = Math.random() < BIG_OBSTACLE_RATIO;
+        s.obstacles.push({ ...randPos(), big });
       }
 
       // checkpoint
