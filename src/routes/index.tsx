@@ -52,14 +52,14 @@ function randPos(): Vec {
 function makeLoot(): Vec[] {
   return Array.from({ length: LOOT_COUNT }, randPos);
 }
-function makeEnemies(): Enemy[] {
-  return Array.from({ length: ENEMY_COUNT }, () => {
-    const big = Math.random() < BIG_ENEMY_RATIO;
-    return { x: rand(WORLD_W), y: rand(WORLD_H), big, hp: big ? 2 : 1 };
+function makeObstacles(): Obstacle[] {
+  return Array.from({ length: OBSTACLE_COUNT }, () => {
+    const big = Math.random() < BIG_OBSTACLE_RATIO;
+    return { x: rand(WORLD_W), y: rand(WORLD_H), big };
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), cooldown: 0 }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0 }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -79,7 +79,7 @@ function initialState() {
     dir: { x: 1, y: 0 } as Dir,
     nextDir: { x: 1, y: 0 } as Dir,
     loot: makeLoot(),
-    enemies: makeEnemies(),
+    obstacles: makeObstacles(),
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
