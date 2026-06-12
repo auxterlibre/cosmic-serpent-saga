@@ -20,14 +20,14 @@ const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 25;
 const BIG_OBSTACLE_RATIO = 0.3;
 const HUNTER_COUNT = 8;
-const HUNTER_SPEED = 3.2;
+const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
 type Dir = Vec;
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Vec[] };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
@@ -59,7 +59,7 @@ function makeObstacles(): Obstacle[] {
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1 }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [] }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -344,6 +344,14 @@ function Game() {
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
             h.angle += diff * Math.min(1, dtSec * 8);
+
+            // Append trail points spaced by ~1 cell
+            const last = h.trail[0];
+            if (!last || Math.hypot(h.x - last.x, h.y - last.y) >= 1) {
+              h.trail.unshift({ x: h.x, y: h.y });
+            }
+            const maxTrail = Math.max(0, h.hp - 1);
+            if (h.trail.length > maxTrail) h.trail.length = maxTrail;
           }
 
           // Assimilate the segment it touched
@@ -436,7 +444,7 @@ function Game() {
               if (h.hp <= 0) {
                 s.score += 15;
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1 });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [] });
               }
               return false;
             }
@@ -537,13 +545,21 @@ function Game() {
       for (const h of s.hunters) {
         const cx = h.x * CELL + CELL / 2 - camX;
         const cy = h.y * CELL + CELL / 2 - camY;
-        if (cx < -CELL || cy < -CELL || cx > wViewW + CELL || cy > wViewH + CELL) continue;
+        if (cx < -CELL * 4 || cy < -CELL * 4 || cx > wViewW + CELL * 4 || cy > wViewH + CELL * 4) continue;
+
+        // Trail segments (body)
+        for (const t of h.trail) {
+          const tx = t.x * CELL + CELL / 2 - camX;
+          const ty = t.y * CELL + CELL / 2 - camY;
+          ctx.fillStyle = "#b14a1a";
+          ctx.fillRect(tx - CELL / 2 + 1, ty - CELL / 2 + 1, CELL - 2, CELL - 2);
+        }
+
+        // Head triangle
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        const scale = 1 + Math.min(1.2, (h.hp - 1) * 0.15);
-        ctx.scale(scale, scale);
-        ctx.fillStyle = h.hp > 1 ? "#dc2626" : "#f97316";
+        ctx.fillStyle = "#f97316";
         ctx.beginPath();
         ctx.moveTo(CELL / 2 - 2, 0);
         ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
@@ -551,11 +567,6 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-        if (h.hp > 1) {
-          ctx.fillStyle = "#fff";
-          ctx.font = "bold 10px monospace";
-          ctx.fillText(String(h.hp), cx - 3, cy - CELL / 2 - 2);
-        }
       }
 
       ctx.fillStyle = "#fde047";
