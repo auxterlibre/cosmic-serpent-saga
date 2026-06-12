@@ -59,7 +59,7 @@ function makeObstacles(): Obstacle[] {
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0 }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1 }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -433,7 +433,7 @@ function Game() {
             if (dx * dx + dy * dy <= HIT_R * HIT_R) {
               s.score += 15;
               s.hunters.splice(i, 1);
-              s.hunters.push({ ...randPos(), angle: 0, cooldown: 0 });
+              s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1 });
               return false;
             }
           }
