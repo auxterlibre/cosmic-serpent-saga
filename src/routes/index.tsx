@@ -545,13 +545,21 @@ function Game() {
       for (const h of s.hunters) {
         const cx = h.x * CELL + CELL / 2 - camX;
         const cy = h.y * CELL + CELL / 2 - camY;
-        if (cx < -CELL || cy < -CELL || cx > wViewW + CELL || cy > wViewH + CELL) continue;
+        if (cx < -CELL * 4 || cy < -CELL * 4 || cx > wViewW + CELL * 4 || cy > wViewH + CELL * 4) continue;
+
+        // Trail segments (body)
+        for (const t of h.trail) {
+          const tx = t.x * CELL + CELL / 2 - camX;
+          const ty = t.y * CELL + CELL / 2 - camY;
+          ctx.fillStyle = "#b14a1a";
+          ctx.fillRect(tx - CELL / 2 + 1, ty - CELL / 2 + 1, CELL - 2, CELL - 2);
+        }
+
+        // Head triangle
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        const scale = 1 + Math.min(1.2, (h.hp - 1) * 0.15);
-        ctx.scale(scale, scale);
-        ctx.fillStyle = h.hp > 1 ? "#dc2626" : "#f97316";
+        ctx.fillStyle = "#f97316";
         ctx.beginPath();
         ctx.moveTo(CELL / 2 - 2, 0);
         ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
@@ -559,11 +567,6 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
-        if (h.hp > 1) {
-          ctx.fillStyle = "#fff";
-          ctx.font = "bold 10px monospace";
-          ctx.fillText(String(h.hp), cx - 3, cy - CELL / 2 - 2);
-        }
       }
 
       ctx.fillStyle = "#fde047";
