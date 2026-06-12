@@ -381,20 +381,6 @@ function Game() {
           p.x += p.vx * stepDt;
           p.y += p.vy * stepDt;
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
-          for (let i = 0; i < s.enemies.length; i++) {
-            const e = s.enemies[i];
-            const size = e.big ? 2 : 1;
-            if (p.x >= e.x - 0.1 && p.x < e.x + size + 0.1 && p.y >= e.y - 0.1 && p.y < e.y + size + 0.1) {
-              e.hp -= s.damage;
-              if (e.hp <= 0) {
-                s.score += e.big ? 25 : 10;
-                s.enemies.splice(i, 1);
-                const big = Math.random() < BIG_ENEMY_RATIO;
-                s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
-              }
-              return false;
-            }
-          }
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
             const dx = p.x - (h.x + 0.5);
@@ -402,7 +388,7 @@ function Game() {
             if (dx * dx + dy * dy <= HIT_R * HIT_R) {
               s.score += 15;
               s.hunters.splice(i, 1);
-              s.hunters.push({ ...randPos(), cooldown: 0 });
+              s.hunters.push({ ...randPos(), angle: 0, cooldown: 0 });
               return false;
             }
           }
