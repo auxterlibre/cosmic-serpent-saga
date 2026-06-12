@@ -554,13 +554,12 @@ function Game() {
       </div>
 
       {isTouch && (
-        <OnScreenDpad
+        <VirtualStick
           onDir={(d) => {
             const cur = stateRef.current.dir;
             if (d.x === -cur.x && d.y === -cur.y) return;
             stateRef.current.nextDir = d;
           }}
-          onReset={reset}
         />
       )}
 
