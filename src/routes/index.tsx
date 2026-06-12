@@ -541,7 +541,9 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        ctx.fillStyle = "#f97316";
+        const scale = 1 + Math.min(1.2, (h.hp - 1) * 0.15);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = h.hp > 1 ? "#dc2626" : "#f97316";
         ctx.beginPath();
         ctx.moveTo(CELL / 2 - 2, 0);
         ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
@@ -549,6 +551,11 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+        if (h.hp > 1) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 10px monospace";
+          ctx.fillText(String(h.hp), cx - 3, cy - CELL / 2 - 2);
+        }
       }
 
       ctx.fillStyle = "#fde047";
