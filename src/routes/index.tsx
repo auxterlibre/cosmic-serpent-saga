@@ -344,6 +344,14 @@ function Game() {
             while (diff > Math.PI) diff -= Math.PI * 2;
             while (diff < -Math.PI) diff += Math.PI * 2;
             h.angle += diff * Math.min(1, dtSec * 8);
+
+            // Append trail points spaced by ~1 cell
+            const last = h.trail[0];
+            if (!last || Math.hypot(h.x - last.x, h.y - last.y) >= 1) {
+              h.trail.unshift({ x: h.x, y: h.y });
+            }
+            const maxTrail = Math.max(0, h.hp - 1);
+            if (h.trail.length > maxTrail) h.trail.length = maxTrail;
           }
 
           // Assimilate the segment it touched
