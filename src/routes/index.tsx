@@ -17,16 +17,17 @@ const WORLD_W = 100;
 const WORLD_H = 100;
 const TICK_MS = 90;
 const LOOT_COUNT = 30;
-const ENEMY_COUNT = 25;
-const BIG_ENEMY_RATIO = 0.3;
+const OBSTACLE_COUNT = 25;
+const BIG_OBSTACLE_RATIO = 0.3;
 const HUNTER_COUNT = 8;
+const HUNTER_SPEED = 3.2; // cells per second
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
 type Dir = Vec;
 
-type Enemy = { x: number; y: number; big: boolean; hp: number };
-type Hunter = { x: number; y: number; cooldown: number };
+type Obstacle = { x: number; y: number; big: boolean };
+type Hunter = { x: number; y: number; angle: number; cooldown: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
