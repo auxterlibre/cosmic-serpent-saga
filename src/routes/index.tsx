@@ -428,12 +428,16 @@ function Game() {
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
+            const hr = HIT_R + Math.min(0.6, h.hp * 0.08);
             const dx = p.x - (h.x + 0.5);
             const dy = p.y - (h.y + 0.5);
-            if (dx * dx + dy * dy <= HIT_R * HIT_R) {
-              s.score += 15;
-              s.hunters.splice(i, 1);
-              s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1 });
+            if (dx * dx + dy * dy <= hr * hr) {
+              h.hp -= s.damage;
+              if (h.hp <= 0) {
+                s.score += 15;
+                s.hunters.splice(i, 1);
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1 });
+              }
               return false;
             }
           }
