@@ -478,32 +478,36 @@ function Game() {
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
       }
 
-      // enemies
-      for (const e of s.enemies) {
-        const size = e.big ? 2 : 1;
-        const px = e.x * CELL - camX;
-        const py = e.y * CELL - camY;
+      // obstacles (inert — block/damage on contact, can't be shot)
+      for (const o of s.obstacles) {
+        const size = o.big ? 2 : 1;
+        const px = o.x * CELL - camX;
+        const py = o.y * CELL - camY;
         if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
-        ctx.fillStyle = e.big ? "#b91c1c" : "#e0455e";
+        ctx.fillStyle = o.big ? "#5b5b6b" : "#6b6b7d";
         ctx.fillRect(px + 2, py + 2, size * CELL - 4, size * CELL - 4);
-        if (e.big && e.hp < 2) {
-          ctx.fillStyle = "#fca5a5";
-          ctx.fillRect(px + 4, py + 4, 4, 4);
-        }
+        ctx.strokeStyle = "#9a9aae";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 3, py + 3, size * CELL - 6, size * CELL - 6);
       }
 
-      // hunters (triangles)
-      ctx.fillStyle = "#f97316";
+      // hunters (triangles rotated to facing direction)
       for (const h of s.hunters) {
-        const px = h.x * CELL - camX;
-        const py = h.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        const cx = h.x * CELL + CELL / 2 - camX;
+        const cy = h.y * CELL + CELL / 2 - camY;
+        if (cx < -CELL || cy < -CELL || cx > wViewW + CELL || cy > wViewH + CELL) continue;
+        ctx.save();
+        ctx.translate(cx, cy);
+        // sprite points "right" by default (+x); rotate by angle so nose follows velocity
+        ctx.rotate(h.angle);
+        ctx.fillStyle = "#f97316";
         ctx.beginPath();
-        ctx.moveTo(px + CELL / 2, py + 2);
-        ctx.lineTo(px + CELL - 2, py + CELL - 2);
-        ctx.lineTo(px + 2, py + CELL - 2);
+        ctx.moveTo(CELL / 2 - 2, 0);
+        ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
+        ctx.lineTo(-CELL / 2 + 2, -CELL / 2 + 2);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
 
       // projectiles
