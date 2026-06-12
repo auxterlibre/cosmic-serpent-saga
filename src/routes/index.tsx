@@ -317,18 +317,32 @@ function Game() {
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
 
-          // Target nearest snake segment
-          let tx = 0, ty = 0, bestD = Infinity, targetIdx = -1;
-          for (let i = 0; i < s.snake.length; i++) {
-            const seg = s.snake[i];
-            const sx = seg.x + 0.5;
-            const sy = seg.y + 0.5;
-            const ddx = sx - (h.x + 0.5);
-            const ddy = sy - (h.y + 0.5);
-            const d = ddx * ddx + ddy * ddy;
-            if (d < bestD) { bestD = d; tx = sx; ty = sy; targetIdx = i; }
+          let tx: number, ty: number;
+          if (h.fleeing) {
+            // Run toward the chosen escape point on the world edge
+            if (!h.fleeTarget) {
+              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
+              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
+              h.fleeTarget = { x: ex, y: ey };
+            }
+            tx = h.fleeTarget.x + 0.5;
+            ty = h.fleeTarget.y + 0.5;
+          } else {
+            // Target nearest snake segment
+            let bestD = Infinity;
+            let bx = 0, by = 0;
+            for (let i = 0; i < s.snake.length; i++) {
+              const seg = s.snake[i];
+              const sx = seg.x + 0.5;
+              const sy = seg.y + 0.5;
+              const ddx = sx - (h.x + 0.5);
+              const ddy = sy - (h.y + 0.5);
+              const d = ddx * ddx + ddy * ddy;
+              if (d < bestD) { bestD = d; bx = sx; by = sy; }
+            }
+            if (bestD === Infinity) continue;
+            tx = bx; ty = by;
           }
-          if (targetIdx < 0) continue;
 
           const dx = tx - (h.x + 0.5);
           const dy = ty - (h.y + 0.5);
@@ -336,7 +350,8 @@ function Game() {
           if (dist > 0.01) {
             const nx = dx / dist;
             const ny = dy / dist;
-            const move = Math.min(step, dist);
+            const fleeSpeedMul = h.fleeing ? 1.15 : 1;
+            const move = Math.min(step * fleeSpeedMul, dist);
             h.x += nx * move;
             h.y += ny * move;
             const target = Math.atan2(ny, nx);
@@ -354,29 +369,54 @@ function Game() {
             if (h.trail.length > maxTrail) h.trail.length = maxTrail;
           }
 
-          // Assimilate the segment it touched
+          // If fleeing and reached the edge, vanish with the loot and respawn fresh
+          if (h.fleeing) {
+            if (h.x < -1 || h.y < -1 || h.x > WORLD_W + 1 || h.y > WORLD_H + 1) {
+              const idx = s.hunters.indexOf(h);
+              if (idx >= 0) {
+                s.hunters.splice(idx, 1);
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+              }
+            }
+            continue;
+          }
+
+          // Collision with snake
           if (h.cooldown <= 0) {
             const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
+            const reach = (hsize + 0.4) * (hsize + 0.4);
+            let hitIdx = -1;
             for (let i = 0; i < s.snake.length; i++) {
               const seg = s.snake[i];
               const ddx = (seg.x + 0.5) - (h.x + 0.5);
               const ddy = (seg.y + 0.5) - (h.y + 0.5);
-              if (ddx * ddx + ddy * ddy <= (hsize + 0.4) * (hsize + 0.4)) {
-                if (i === 0) {
-                  s.alive = false;
-                  syncHud();
-                  return;
-                }
-                s.snake.splice(i, 1);
-                h.hp += 1;
-                h.cooldown = 600;
-                if (s.snake.length === 0) {
-                  s.alive = false;
-                  syncHud();
-                  return;
-                }
-                break;
+              if (ddx * ddx + ddy * ddy <= reach) { hitIdx = i; break; }
+            }
+            if (hitIdx === 0) {
+              // Touched the head: player loses tail, hunter destroyed
+              s.snake.pop();
+              if (s.snake.length === 0) {
+                s.alive = false;
+                syncHud();
+                return;
               }
+              const idx = s.hunters.indexOf(h);
+              if (idx >= 0) {
+                s.hunters.splice(idx, 1);
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+              }
+              syncHud();
+              continue;
+            } else if (hitIdx > 0) {
+              // Steal a body segment and flee with the loot
+              s.snake.splice(hitIdx, 1);
+              h.hp += 1;
+              h.cooldown = 400;
+              h.fleeing = true;
+              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
+              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
+              h.fleeTarget = { x: ex, y: ey };
+              syncHud();
             }
           }
         }
