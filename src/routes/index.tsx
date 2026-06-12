@@ -27,7 +27,7 @@ type Vec = { x: number; y: number };
 type Dir = Vec;
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
@@ -59,7 +59,7 @@ function makeObstacles(): Obstacle[] {
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0 }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1 }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -312,41 +312,63 @@ function Game() {
       if (!s.alive || s.paused) return;
 
       {
-        const head = s.snake[0];
-        if (head) {
-          const dtSec = dt / 1000;
-          const step = HUNTER_SPEED * dtSec;
-          const hx = head.x + 0.5;
-          const hy = head.y + 0.5;
-          for (const h of s.hunters) {
-            const dx = hx - (h.x + 0.5);
-            const dy = hy - (h.y + 0.5);
-            const dist = Math.hypot(dx, dy);
-            if (dist > 0.01) {
-              const nx = dx / dist;
-              const ny = dy / dist;
-              const move = Math.min(step, dist);
-              h.x += nx * move;
-              h.y += ny * move;
-              const target = Math.atan2(ny, nx);
-              let diff = target - h.angle;
-              while (diff > Math.PI) diff -= Math.PI * 2;
-              while (diff < -Math.PI) diff += Math.PI * 2;
-              h.angle += diff * Math.min(1, dtSec * 8);
-            }
+        const dtSec = dt / 1000;
+        const step = HUNTER_SPEED * dtSec;
+        for (const h of s.hunters) {
+          if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
 
-            const cx = Math.floor(h.x + 0.5);
-            const cy = Math.floor(h.y + 0.5);
-            const hitIdx = s.snake.findIndex((seg) => seg.x === cx && seg.y === cy);
-            if (hitIdx >= 0) {
-              if (hitIdx === 0) {
-                s.alive = false;
-              } else {
-                s.snake.pop();
-                if (s.snake.length === 0) s.alive = false;
+          // Target nearest snake segment
+          let tx = 0, ty = 0, bestD = Infinity, targetIdx = -1;
+          for (let i = 0; i < s.snake.length; i++) {
+            const seg = s.snake[i];
+            const sx = seg.x + 0.5;
+            const sy = seg.y + 0.5;
+            const ddx = sx - (h.x + 0.5);
+            const ddy = sy - (h.y + 0.5);
+            const d = ddx * ddx + ddy * ddy;
+            if (d < bestD) { bestD = d; tx = sx; ty = sy; targetIdx = i; }
+          }
+          if (targetIdx < 0) continue;
+
+          const dx = tx - (h.x + 0.5);
+          const dy = ty - (h.y + 0.5);
+          const dist = Math.hypot(dx, dy);
+          if (dist > 0.01) {
+            const nx = dx / dist;
+            const ny = dy / dist;
+            const move = Math.min(step, dist);
+            h.x += nx * move;
+            h.y += ny * move;
+            const target = Math.atan2(ny, nx);
+            let diff = target - h.angle;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            h.angle += diff * Math.min(1, dtSec * 8);
+          }
+
+          // Assimilate the segment it touched
+          if (h.cooldown <= 0) {
+            const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
+            for (let i = 0; i < s.snake.length; i++) {
+              const seg = s.snake[i];
+              const ddx = (seg.x + 0.5) - (h.x + 0.5);
+              const ddy = (seg.y + 0.5) - (h.y + 0.5);
+              if (ddx * ddx + ddy * ddy <= (hsize + 0.4) * (hsize + 0.4)) {
+                if (i === 0) {
+                  s.alive = false;
+                  syncHud();
+                  return;
+                }
+                s.snake.splice(i, 1);
+                h.hp += 1;
+                h.cooldown = 600;
+                if (s.snake.length === 0) {
+                  s.alive = false;
+                  syncHud();
+                  return;
+                }
+                break;
               }
-              h.x -= (dx / (dist || 1)) * 0.6;
-              h.y -= (dy / (dist || 1)) * 0.6;
             }
           }
         }
@@ -406,12 +428,16 @@ function Game() {
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
+            const hr = HIT_R + Math.min(0.6, h.hp * 0.08);
             const dx = p.x - (h.x + 0.5);
             const dy = p.y - (h.y + 0.5);
-            if (dx * dx + dy * dy <= HIT_R * HIT_R) {
-              s.score += 15;
-              s.hunters.splice(i, 1);
-              s.hunters.push({ ...randPos(), angle: 0, cooldown: 0 });
+            if (dx * dx + dy * dy <= hr * hr) {
+              h.hp -= s.damage;
+              if (h.hp <= 0) {
+                s.score += 15;
+                s.hunters.splice(i, 1);
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1 });
+              }
               return false;
             }
           }
@@ -515,7 +541,9 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        ctx.fillStyle = "#f97316";
+        const scale = 1 + Math.min(1.2, (h.hp - 1) * 0.15);
+        ctx.scale(scale, scale);
+        ctx.fillStyle = h.hp > 1 ? "#dc2626" : "#f97316";
         ctx.beginPath();
         ctx.moveTo(CELL / 2 - 2, 0);
         ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
@@ -523,6 +551,11 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         ctx.restore();
+        if (h.hp > 1) {
+          ctx.fillStyle = "#fff";
+          ctx.font = "bold 10px monospace";
+          ctx.fillText(String(h.hp), cx - 3, cy - CELL / 2 - 2);
+        }
       }
 
       ctx.fillStyle = "#fde047";
