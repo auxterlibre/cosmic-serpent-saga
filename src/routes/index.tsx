@@ -484,7 +484,7 @@ function Game() {
               if (h.hp <= 0) {
                 s.score += 15;
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [] });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
               }
               return false;
             }
