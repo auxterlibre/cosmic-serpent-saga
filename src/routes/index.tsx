@@ -624,20 +624,18 @@ function Game() {
 }
 
 function VirtualStick({ onDir }: { onDir: (d: Dir) => void }) {
-  const baseRef = useRef<HTMLDivElement>(null);
-  const [knob, setKnob] = useState<{ x: number; y: number } | null>(null);
+  const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
+  const [knob, setKnob] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const activeId = useRef<number | null>(null);
+  const originRef = useRef<{ x: number; y: number } | null>(null);
   const RADIUS = 56;
   const DEAD = 14;
 
   const updateFromPoint = (clientX: number, clientY: number) => {
-    const base = baseRef.current;
-    if (!base) return;
-    const r = base.getBoundingClientRect();
-    const cx = r.left + r.width / 2;
-    const cy = r.top + r.height / 2;
-    let dx = clientX - cx;
-    let dy = clientY - cy;
+    const o = originRef.current;
+    if (!o) return;
+    let dx = clientX - o.x;
+    let dy = clientY - o.y;
     const len = Math.hypot(dx, dy);
     if (len > RADIUS) { dx = (dx / len) * RADIUS; dy = (dy / len) * RADIUS; }
     setKnob({ x: dx, y: dy });
@@ -648,13 +646,16 @@ function VirtualStick({ onDir }: { onDir: (d: Dir) => void }) {
 
   return (
     <div
-      ref={baseRef}
-      className="pointer-events-auto absolute bottom-8 left-8 h-32 w-32 touch-none select-none rounded-full border border-cyan-500/40 bg-black/40 backdrop-blur"
+      className="pointer-events-auto absolute inset-0 touch-none select-none"
       onPointerDown={(e) => {
+        if (activeId.current !== null) return;
         e.preventDefault();
-        (e.target as Element).setPointerCapture?.(e.pointerId);
+        (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
         activeId.current = e.pointerId;
-        updateFromPoint(e.clientX, e.clientY);
+        const o = { x: e.clientX, y: e.clientY };
+        originRef.current = o;
+        setOrigin(o);
+        setKnob({ x: 0, y: 0 });
       }}
       onPointerMove={(e) => {
         if (activeId.current !== e.pointerId) return;
@@ -663,17 +664,35 @@ function VirtualStick({ onDir }: { onDir: (d: Dir) => void }) {
       onPointerUp={(e) => {
         if (activeId.current !== e.pointerId) return;
         activeId.current = null;
-        setKnob(null);
+        originRef.current = null;
+        setOrigin(null);
       }}
-      onPointerCancel={() => { activeId.current = null; setKnob(null); }}
+      onPointerCancel={() => {
+        activeId.current = null;
+        originRef.current = null;
+        setOrigin(null);
+      }}
     >
-      <div
-        className="absolute h-12 w-12 rounded-full border border-cyan-300/60 bg-cyan-400/30"
-        style={{
-          left: `calc(50% - 24px + ${knob?.x ?? 0}px)`,
-          top: `calc(50% - 24px + ${knob?.y ?? 0}px)`,
-        }}
-      />
+      {origin && (
+        <>
+          <div
+            className="pointer-events-none absolute rounded-full border border-cyan-500/40 bg-black/30 backdrop-blur"
+            style={{
+              left: origin.x - RADIUS,
+              top: origin.y - RADIUS,
+              width: RADIUS * 2,
+              height: RADIUS * 2,
+            }}
+          />
+          <div
+            className="pointer-events-none absolute h-12 w-12 rounded-full border border-cyan-300/60 bg-cyan-400/30"
+            style={{
+              left: origin.x - 24 + knob.x,
+              top: origin.y - 24 + knob.y,
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }
