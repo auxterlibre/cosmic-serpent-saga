@@ -20,7 +20,7 @@ const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 25;
 const BIG_OBSTACLE_RATIO = 0.3;
 const HUNTER_COUNT = 8;
-const HUNTER_SPEED = 3.2; // cells per second
+const HUNTER_SPEED = 3.2;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
@@ -90,10 +90,9 @@ function initialState() {
     fireRange: 8,
     fireTimer: 0,
     hunterTimer: 0,
-    paused: false,
+    paused: true,
     shopOpen: false,
-    boost: false,
-    manualPause: false,
+    manualPause: true,
   };
 }
 
@@ -110,21 +109,8 @@ function Game() {
     fireRange: 8,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
-
-  // Touch detection
-  const [isTouch, setIsTouch] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(pointer: coarse)");
-    const update = () => setIsTouch(mq.matches || "ontouchstart" in window);
-    update();
-    mq.addEventListener?.("change", update);
-    const onTouch = () => setIsTouch(true);
-    window.addEventListener("touchstart", onTouch, { once: true, passive: true });
-    return () => {
-      mq.removeEventListener?.("change", update);
-      window.removeEventListener("touchstart", onTouch);
-    };
-  }, []);
+  const [started, setStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   // Input
   useEffect(() => {
@@ -132,10 +118,8 @@ function Game() {
       if (e.repeat) return;
       if (e.key === "r" || e.key === "R") { reset(); return; }
       if (e.key === "Escape") { closeShop(); return; }
-      if (e.key === "Shift") { stateRef.current.boost = true; return; }
       if (e.key === "p" || e.key === "P") {
-        const s = stateRef.current;
-        if (!s.shopOpen) { s.manualPause = !s.manualPause; s.paused = s.manualPause; }
+        togglePause();
         return;
       }
       const d = DIRS[e.key];
@@ -144,12 +128,43 @@ function Game() {
       if (d.x === -cur.x && d.y === -cur.y) return;
       stateRef.current.nextDir = d;
     };
-    const onKeyUp = (e: KeyboardEvent) => {
-      if (e.key === "Shift") stateRef.current.boost = false;
-    };
     window.addEventListener("keydown", onKey);
-    window.addEventListener("keyup", onKeyUp);
-    return () => { window.removeEventListener("keydown", onKey); window.removeEventListener("keyup", onKeyUp); };
+    return () => { window.removeEventListener("keydown", onKey); };
+  }, []);
+
+  // Swipe input
+  useEffect(() => {
+    const c = canvasRef.current;
+    if (!c) return;
+    let sx = 0, sy = 0, active = false;
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType === "mouse") return;
+      active = true; sx = e.clientX; sy = e.clientY;
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!active) return;
+      const dx = e.clientX - sx;
+      const dy = e.clientY - sy;
+      const THRESH = 24;
+      if (Math.abs(dx) < THRESH && Math.abs(dy) < THRESH) return;
+      let d: Dir;
+      if (Math.abs(dx) > Math.abs(dy)) d = { x: Math.sign(dx), y: 0 };
+      else d = { x: 0, y: Math.sign(dy) };
+      const cur = stateRef.current.dir;
+      if (!(d.x === -cur.x && d.y === -cur.y)) stateRef.current.nextDir = d;
+      sx = e.clientX; sy = e.clientY;
+    };
+    const onUp = () => { active = false; };
+    c.addEventListener("pointerdown", onDown);
+    c.addEventListener("pointermove", onMove);
+    c.addEventListener("pointerup", onUp);
+    c.addEventListener("pointercancel", onUp);
+    return () => {
+      c.removeEventListener("pointerdown", onDown);
+      c.removeEventListener("pointermove", onMove);
+      c.removeEventListener("pointerup", onUp);
+      c.removeEventListener("pointercancel", onUp);
+    };
   }, []);
 
   // Resize
@@ -170,6 +185,24 @@ function Game() {
     stateRef.current = initialState();
     setHud({ score: 0, length: 3, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
     setShop({ open: false, checkpoint: null });
+    setStarted(false);
+    setPaused(false);
+  }
+
+  function startGame() {
+    const s = stateRef.current;
+    s.paused = false;
+    s.manualPause = false;
+    setStarted(true);
+    setPaused(false);
+  }
+
+  function togglePause() {
+    const s = stateRef.current;
+    if (s.shopOpen || !started) return;
+    s.manualPause = !s.manualPause;
+    s.paused = s.manualPause;
+    setPaused(s.manualPause);
   }
 
   function closeShop() {
@@ -237,7 +270,6 @@ function Game() {
       const newHead = { x: nx, y: ny };
       s.snake.unshift(newHead);
 
-      // loot
       const lootIdx = s.loot.findIndex((l) => l.x === nx && l.y === ny);
       let grew = false;
       if (lootIdx >= 0) {
@@ -247,7 +279,6 @@ function Game() {
         grew = true;
       }
 
-      // obstacle collision (squares) — damages the snake but isn't a target
       const obIdx = s.obstacles.findIndex(
         (o) => nx >= o.x && nx <= o.x + (o.big ? 1 : 0) && ny >= o.y && ny <= o.y + (o.big ? 1 : 0),
       );
@@ -260,7 +291,6 @@ function Game() {
         s.obstacles.push({ ...randPos(), big });
       }
 
-      // checkpoint
       const cpIdx = s.checkpoints.findIndex((c) => c.x === nx && c.y === ny);
       if (cpIdx >= 0) {
         s.paused = true;
@@ -268,7 +298,6 @@ function Game() {
         setShop({ open: true, checkpoint: cpIdx });
       }
 
-      // resolve tail
       if (!grew) s.snake.pop();
       for (let i = 0; i < shrink; i++) {
         if (s.snake.length > 0) s.snake.pop();
@@ -282,7 +311,6 @@ function Game() {
       const s = stateRef.current;
       if (!s.alive || s.paused) return;
 
-      // Hunters move smoothly toward head
       {
         const head = s.snake[0];
         if (head) {
@@ -300,7 +328,6 @@ function Game() {
               const move = Math.min(step, dist);
               h.x += nx * move;
               h.y += ny * move;
-              // smooth angle interpolation toward movement direction
               const target = Math.atan2(ny, nx);
               let diff = target - h.angle;
               while (diff > Math.PI) diff -= Math.PI * 2;
@@ -308,7 +335,6 @@ function Game() {
               h.angle += diff * Math.min(1, dtSec * 8);
             }
 
-            // Collision with snake (cell-based)
             const cx = Math.floor(h.x + 0.5);
             const cy = Math.floor(h.y + 0.5);
             const hitIdx = s.snake.findIndex((seg) => seg.x === cx && seg.y === cy);
@@ -319,7 +345,6 @@ function Game() {
                 s.snake.pop();
                 if (s.snake.length === 0) s.alive = false;
               }
-              // bump hunter back along its velocity
               h.x -= (dx / (dist || 1)) * 0.6;
               h.y -= (dy / (dist || 1)) * 0.6;
             }
@@ -327,7 +352,6 @@ function Game() {
         }
       }
 
-      // Auto-fire (targets hunters only — obstacles are inert)
       s.fireTimer += dt;
       if (s.fireTimer >= s.fireIntervalMs) {
         const head = s.snake[0];
@@ -371,7 +395,6 @@ function Game() {
         }
       }
 
-      // Projectile substeps
       const dtSec = dt / 1000;
       const HIT_R = 0.6;
       s.projectiles = s.projectiles.filter((p) => {
@@ -402,10 +425,9 @@ function Game() {
       const dt = now - last;
       last = now;
       acc += dt;
-      const tickMs = stateRef.current.boost ? TICK_MS / 2 : TICK_MS;
-      while (acc >= tickMs) {
+      while (acc >= TICK_MS) {
         tick();
-        acc -= tickMs;
+        acc -= TICK_MS;
       }
       updateRealtime(dt);
       draw();
@@ -423,7 +445,6 @@ function Game() {
       const viewW = c.width;
       const viewH = c.height;
 
-      // Zoom out on portrait/narrow screens
       const portrait = viewH > viewW;
       const zoom = portrait ? Math.min(1, Math.max(0.45, viewW / 800)) : 1;
       const wViewW = viewW / zoom;
@@ -439,7 +460,6 @@ function Game() {
       ctx.fillRect(0, 0, viewW, viewH);
       ctx.setTransform(zoom, 0, 0, zoom, 0, 0);
 
-      // starfield
       ctx.fillStyle = "#1a1a3a";
       const startX = Math.floor(camX / 40) * 40;
       const startY = Math.floor(camY / 40) * 40;
@@ -454,7 +474,6 @@ function Game() {
       ctx.lineWidth = 2;
       ctx.strokeRect(-camX, -camY, WORLD_W * CELL, WORLD_H * CELL);
 
-      // checkpoints
       for (const cp of s.checkpoints) {
         const px = cp.x * CELL - camX;
         const py = cp.y * CELL - camY;
@@ -469,7 +488,6 @@ function Game() {
         ctx.fillText("$", px + 7, py + 14);
       }
 
-      // loot
       ctx.fillStyle = "#f5d142";
       for (const l of s.loot) {
         const px = l.x * CELL - camX;
@@ -478,7 +496,6 @@ function Game() {
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
       }
 
-      // obstacles (inert — block/damage on contact, can't be shot)
       for (const o of s.obstacles) {
         const size = o.big ? 2 : 1;
         const px = o.x * CELL - camX;
@@ -491,14 +508,12 @@ function Game() {
         ctx.strokeRect(px + 3, py + 3, size * CELL - 6, size * CELL - 6);
       }
 
-      // hunters (triangles rotated to facing direction)
       for (const h of s.hunters) {
         const cx = h.x * CELL + CELL / 2 - camX;
         const cy = h.y * CELL + CELL / 2 - camY;
         if (cx < -CELL || cy < -CELL || cx > wViewW + CELL || cy > wViewH + CELL) continue;
         ctx.save();
         ctx.translate(cx, cy);
-        // sprite points "right" by default (+x); rotate by angle so nose follows velocity
         ctx.rotate(h.angle);
         ctx.fillStyle = "#f97316";
         ctx.beginPath();
@@ -510,7 +525,6 @@ function Game() {
         ctx.restore();
       }
 
-      // projectiles
       ctx.fillStyle = "#fde047";
       for (const p of s.projectiles) {
         const px = p.x * CELL - camX;
@@ -518,7 +532,6 @@ function Game() {
         ctx.fillRect(px - 2, py - 2, 4, 4);
       }
 
-      // snake
       s.snake.forEach((seg, i) => {
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
@@ -526,7 +539,6 @@ function Game() {
         ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
       });
 
-      // fire range indicator
       if (s.snake[0]) {
         const hx = s.snake[0].x * CELL + CELL / 2 - camX;
         const hy = s.snake[0].y * CELL + CELL / 2 - camY;
@@ -546,28 +558,66 @@ function Game() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]">
-      <canvas ref={canvasRef} className="block" />
-      <div className="pointer-events-none absolute left-4 top-4 rounded-md bg-black/50 px-3 py-2 font-mono text-sm text-cyan-200 backdrop-blur">
-        <div>SCORE: {hud.score}</div>
-        <div>SEGMENTS (HP): {hud.length}</div>
-        <div>FIRE: {(hud.fireIntervalMs / 1000).toFixed(2)}s · DMG: {hud.damage} · RNG: {hud.fireRange}</div>
-        <div className="mt-1 text-xs text-cyan-400/70">Arrows/WASD steer · Shift boost · P pause · R reset</div>
-        <div className="text-xs text-cyan-400/70">Segments are your health AND your currency</div>
-      </div>
+      <canvas ref={canvasRef} className="block touch-none" />
 
-      {isTouch && (
-        <VirtualStick
-          onDir={(d) => {
-            const cur = stateRef.current.dir;
-            if (d.x === -cur.x && d.y === -cur.y) return;
-            stateRef.current.nextDir = d;
-          }}
-        />
+      {/* Small pause button */}
+      {started && hud.alive && !shop.open && (
+        <button
+          onClick={togglePause}
+          aria-label={paused ? "Resume" : "Pause"}
+          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-500/40 bg-black/50 text-cyan-200 backdrop-blur hover:bg-black/70"
+        >
+          {paused ? (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          ) : (
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h4v14H6zM14 5h4v14h-4z" /></svg>
+          )}
+        </button>
+      )}
+
+      {/* Start / instructions screen */}
+      {!started && hud.alive && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/70 px-6">
+          <div className="w-full max-w-sm rounded-lg border border-cyan-500/40 bg-[#0a0a18] px-6 py-6 font-mono text-cyan-200">
+            <div className="text-2xl">SPACE TRAIN</div>
+            <div className="mt-1 text-xs opacity-70">A snake-like space convoy</div>
+
+            <div className="mt-5 text-sm font-semibold text-cyan-300">HOW TO PLAY</div>
+            <ul className="mt-2 space-y-2 text-sm">
+              <li>👆 <span className="opacity-80">Swipe</span> to steer (up / down / left / right)</li>
+              <li>⌨️ <span className="opacity-80">Arrows or WASD</span> on keyboard</li>
+              <li>💛 Collect loot to grow longer</li>
+              <li>🟧 Hunters chase you — you auto-fire at them</li>
+              <li>⬜ Gray obstacles damage you on contact</li>
+              <li>🟪 Checkpoints open the upgrade shop</li>
+              <li>❤️ Segments are both your HEALTH and your CURRENCY</li>
+            </ul>
+
+            <button
+              onClick={startGame}
+              className="mt-6 w-full rounded bg-cyan-500/20 px-4 py-3 text-base hover:bg-cyan-500/30"
+            >
+              START
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pause overlay */}
+      {started && paused && hud.alive && !shop.open && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+          <button
+            onClick={togglePause}
+            className="rounded border border-cyan-500/40 bg-[#0a0a18] px-6 py-3 font-mono text-cyan-200 hover:bg-cyan-500/10"
+          >
+            PAUSED — tap to resume
+          </button>
+        </div>
       )}
 
       {shop.open && hud.alive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
-          <div className="w-[360px] rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-sm rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
             <div className="mt-1 text-xs opacity-70">Spend segments to upgrade. Segments = health — don't drop to 0!</div>
             <div className="mt-4 text-sm">Segments: <span className="text-cyan-300">{hud.length}</span></div>
@@ -601,14 +651,14 @@ function Game() {
               onClick={closeShop}
               className="mt-4 w-full rounded bg-cyan-500/20 px-3 py-2 text-sm hover:bg-cyan-500/30"
             >
-              Leave (Esc)
+              Leave
             </button>
           </div>
         </div>
       )}
 
       {!hud.alive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
           <div className="rounded-lg border border-cyan-500/40 bg-[#0a0a18] px-8 py-6 text-center font-mono text-cyan-200">
             <div className="text-2xl">GAME OVER</div>
             <div className="mt-2 text-sm opacity-80">Score {hud.score} · Length {hud.length}</div>
@@ -616,84 +666,10 @@ function Game() {
               onClick={reset}
               className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm hover:bg-cyan-500/30"
             >
-              Restart (R)
+              Restart
             </button>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
-
-function VirtualStick({ onDir }: { onDir: (d: Dir) => void }) {
-  const [origin, setOrigin] = useState<{ x: number; y: number } | null>(null);
-  const [knob, setKnob] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-  const activeId = useRef<number | null>(null);
-  const originRef = useRef<{ x: number; y: number } | null>(null);
-  const RADIUS = 56;
-  const DEAD = 14;
-
-  const updateFromPoint = (clientX: number, clientY: number) => {
-    const o = originRef.current;
-    if (!o) return;
-    let dx = clientX - o.x;
-    let dy = clientY - o.y;
-    const len = Math.hypot(dx, dy);
-    if (len > RADIUS) { dx = (dx / len) * RADIUS; dy = (dy / len) * RADIUS; }
-    setKnob({ x: dx, y: dy });
-    if (len < DEAD) return;
-    if (Math.abs(dx) > Math.abs(dy)) onDir({ x: Math.sign(dx), y: 0 });
-    else onDir({ x: 0, y: Math.sign(dy) });
-  };
-
-  return (
-    <div
-      className="pointer-events-auto absolute inset-0 touch-none select-none"
-      onPointerDown={(e) => {
-        if (activeId.current !== null) return;
-        e.preventDefault();
-        (e.currentTarget as Element).setPointerCapture?.(e.pointerId);
-        activeId.current = e.pointerId;
-        const o = { x: e.clientX, y: e.clientY };
-        originRef.current = o;
-        setOrigin(o);
-        setKnob({ x: 0, y: 0 });
-      }}
-      onPointerMove={(e) => {
-        if (activeId.current !== e.pointerId) return;
-        updateFromPoint(e.clientX, e.clientY);
-      }}
-      onPointerUp={(e) => {
-        if (activeId.current !== e.pointerId) return;
-        activeId.current = null;
-        originRef.current = null;
-        setOrigin(null);
-      }}
-      onPointerCancel={() => {
-        activeId.current = null;
-        originRef.current = null;
-        setOrigin(null);
-      }}
-    >
-      {origin && (
-        <>
-          <div
-            className="pointer-events-none absolute rounded-full border border-cyan-500/40 bg-black/30 backdrop-blur"
-            style={{
-              left: origin.x - RADIUS,
-              top: origin.y - RADIUS,
-              width: RADIUS * 2,
-              height: RADIUS * 2,
-            }}
-          />
-          <div
-            className="pointer-events-none absolute h-12 w-12 rounded-full border border-cyan-300/60 bg-cyan-400/30"
-            style={{
-              left: origin.x - 24 + knob.x,
-              top: origin.y - 24 + knob.y,
-            }}
-          />
-        </>
       )}
     </div>
   );
