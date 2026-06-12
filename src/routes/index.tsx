@@ -554,13 +554,12 @@ function Game() {
       </div>
 
       {isTouch && (
-        <OnScreenDpad
+        <VirtualStick
           onDir={(d) => {
             const cur = stateRef.current.dir;
             if (d.x === -cur.x && d.y === -cur.y) return;
             stateRef.current.nextDir = d;
           }}
-          onReset={reset}
         />
       )}
 
@@ -624,34 +623,57 @@ function Game() {
   );
 }
 
-function OnScreenDpad({
-  onDir,
-  onReset,
-}: {
-  onDir: (d: Dir) => void;
-  onReset: () => void;
-}) {
-  const btn =
-    "pointer-events-auto flex h-12 w-12 items-center justify-center rounded-md border border-cyan-500/40 bg-black/50 font-mono text-lg text-cyan-200 backdrop-blur active:bg-cyan-500/40 select-none touch-none";
-  const press = (d: Dir) => (e: React.PointerEvent) => {
-    e.preventDefault();
-    onDir(d);
+function VirtualStick({ onDir }: { onDir: (d: Dir) => void }) {
+  const baseRef = useRef<HTMLDivElement>(null);
+  const [knob, setKnob] = useState<{ x: number; y: number } | null>(null);
+  const activeId = useRef<number | null>(null);
+  const RADIUS = 56;
+  const DEAD = 14;
+
+  const updateFromPoint = (clientX: number, clientY: number) => {
+    const base = baseRef.current;
+    if (!base) return;
+    const r = base.getBoundingClientRect();
+    const cx = r.left + r.width / 2;
+    const cy = r.top + r.height / 2;
+    let dx = clientX - cx;
+    let dy = clientY - cy;
+    const len = Math.hypot(dx, dy);
+    if (len > RADIUS) { dx = (dx / len) * RADIUS; dy = (dy / len) * RADIUS; }
+    setKnob({ x: dx, y: dy });
+    if (len < DEAD) return;
+    if (Math.abs(dx) > Math.abs(dy)) onDir({ x: Math.sign(dx), y: 0 });
+    else onDir({ x: 0, y: Math.sign(dy) });
   };
+
   return (
-    <div className="absolute bottom-6 right-6 flex flex-col items-center gap-1">
-      <button className={btn} onPointerDown={press({ x: 0, y: -1 })} aria-label="Up">▲</button>
-      <div className="flex gap-1">
-        <button className={btn} onPointerDown={press({ x: -1, y: 0 })} aria-label="Left">◀</button>
-        <button
-          className={btn + " text-xs"}
-          onPointerDown={(e) => { e.preventDefault(); onReset(); }}
-          aria-label="Reset"
-        >
-          R
-        </button>
-        <button className={btn} onPointerDown={press({ x: 1, y: 0 })} aria-label="Right">▶</button>
-      </div>
-      <button className={btn} onPointerDown={press({ x: 0, y: 1 })} aria-label="Down">▼</button>
+    <div
+      ref={baseRef}
+      className="pointer-events-auto absolute bottom-8 left-8 h-32 w-32 touch-none select-none rounded-full border border-cyan-500/40 bg-black/40 backdrop-blur"
+      onPointerDown={(e) => {
+        e.preventDefault();
+        (e.target as Element).setPointerCapture?.(e.pointerId);
+        activeId.current = e.pointerId;
+        updateFromPoint(e.clientX, e.clientY);
+      }}
+      onPointerMove={(e) => {
+        if (activeId.current !== e.pointerId) return;
+        updateFromPoint(e.clientX, e.clientY);
+      }}
+      onPointerUp={(e) => {
+        if (activeId.current !== e.pointerId) return;
+        activeId.current = null;
+        setKnob(null);
+      }}
+      onPointerCancel={() => { activeId.current = null; setKnob(null); }}
+    >
+      <div
+        className="absolute h-12 w-12 rounded-full border border-cyan-300/60 bg-cyan-400/30"
+        style={{
+          left: `calc(50% - 24px + ${knob?.x ?? 0}px)`,
+          top: `calc(50% - 24px + ${knob?.y ?? 0}px)`,
+        }}
+      />
     </div>
   );
 }
