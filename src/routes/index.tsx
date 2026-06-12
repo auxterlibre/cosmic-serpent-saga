@@ -17,16 +17,17 @@ const WORLD_W = 100;
 const WORLD_H = 100;
 const TICK_MS = 90;
 const LOOT_COUNT = 30;
-const ENEMY_COUNT = 25;
-const BIG_ENEMY_RATIO = 0.3;
+const OBSTACLE_COUNT = 25;
+const BIG_OBSTACLE_RATIO = 0.3;
 const HUNTER_COUNT = 8;
+const HUNTER_SPEED = 3.2; // cells per second
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
 type Dir = Vec;
 
-type Enemy = { x: number; y: number; big: boolean; hp: number };
-type Hunter = { x: number; y: number; cooldown: number };
+type Obstacle = { x: number; y: number; big: boolean };
+type Hunter = { x: number; y: number; angle: number; cooldown: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
@@ -51,14 +52,14 @@ function randPos(): Vec {
 function makeLoot(): Vec[] {
   return Array.from({ length: LOOT_COUNT }, randPos);
 }
-function makeEnemies(): Enemy[] {
-  return Array.from({ length: ENEMY_COUNT }, () => {
-    const big = Math.random() < BIG_ENEMY_RATIO;
-    return { x: rand(WORLD_W), y: rand(WORLD_H), big, hp: big ? 2 : 1 };
+function makeObstacles(): Obstacle[] {
+  return Array.from({ length: OBSTACLE_COUNT }, () => {
+    const big = Math.random() < BIG_OBSTACLE_RATIO;
+    return { x: rand(WORLD_W), y: rand(WORLD_H), big };
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), cooldown: 0 }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0 }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -78,7 +79,7 @@ function initialState() {
     dir: { x: 1, y: 0 } as Dir,
     nextDir: { x: 1, y: 0 } as Dir,
     loot: makeLoot(),
-    enemies: makeEnemies(),
+    obstacles: makeObstacles(),
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
@@ -246,17 +247,17 @@ function Game() {
         grew = true;
       }
 
-      // enemy collision (squares)
-      const enemyIdx = s.enemies.findIndex(
-        (e) => nx >= e.x && nx <= e.x + (e.big ? 1 : 0) && ny >= e.y && ny <= e.y + (e.big ? 1 : 0),
+      // obstacle collision (squares) — damages the snake but isn't a target
+      const obIdx = s.obstacles.findIndex(
+        (o) => nx >= o.x && nx <= o.x + (o.big ? 1 : 0) && ny >= o.y && ny <= o.y + (o.big ? 1 : 0),
       );
       let shrink = 0;
-      if (enemyIdx >= 0) {
-        const e = s.enemies[enemyIdx];
-        shrink += e.big ? 2 : 1;
-        s.enemies.splice(enemyIdx, 1);
-        const big = Math.random() < BIG_ENEMY_RATIO;
-        s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
+      if (obIdx >= 0) {
+        const o = s.obstacles[obIdx];
+        shrink += o.big ? 2 : 1;
+        s.obstacles.splice(obIdx, 1);
+        const big = Math.random() < BIG_OBSTACLE_RATIO;
+        s.obstacles.push({ ...randPos(), big });
       }
 
       // checkpoint
@@ -281,34 +282,52 @@ function Game() {
       const s = stateRef.current;
       if (!s.alive || s.paused) return;
 
-      // Hunters move toward head
-      s.hunterTimer += dt;
-      const HUNTER_STEP_MS = 220;
-      while (s.hunterTimer >= HUNTER_STEP_MS) {
-        s.hunterTimer -= HUNTER_STEP_MS;
+      // Hunters move smoothly toward head
+      {
         const head = s.snake[0];
-        if (!head) break;
-        for (const h of s.hunters) {
-          const dx = head.x - h.x;
-          const dy = head.y - h.y;
-          if (Math.abs(dx) > Math.abs(dy)) h.x += Math.sign(dx);
-          else if (dy !== 0) h.y += Math.sign(dy);
-          else if (dx !== 0) h.x += Math.sign(dx);
-
-          const hitIdx = s.snake.findIndex((seg) => seg.x === h.x && seg.y === h.y);
-          if (hitIdx >= 0) {
-            if (hitIdx === 0) {
-              s.alive = false;
-            } else {
-              s.snake.pop();
-              if (s.snake.length === 0) s.alive = false;
+        if (head) {
+          const dtSec = dt / 1000;
+          const step = HUNTER_SPEED * dtSec;
+          const hx = head.x + 0.5;
+          const hy = head.y + 0.5;
+          for (const h of s.hunters) {
+            const dx = hx - (h.x + 0.5);
+            const dy = hy - (h.y + 0.5);
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.01) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const move = Math.min(step, dist);
+              h.x += nx * move;
+              h.y += ny * move;
+              // smooth angle interpolation toward movement direction
+              const target = Math.atan2(ny, nx);
+              let diff = target - h.angle;
+              while (diff > Math.PI) diff -= Math.PI * 2;
+              while (diff < -Math.PI) diff += Math.PI * 2;
+              h.angle += diff * Math.min(1, dtSec * 8);
             }
-            h.x -= Math.sign(dx || 1);
+
+            // Collision with snake (cell-based)
+            const cx = Math.floor(h.x + 0.5);
+            const cy = Math.floor(h.y + 0.5);
+            const hitIdx = s.snake.findIndex((seg) => seg.x === cx && seg.y === cy);
+            if (hitIdx >= 0) {
+              if (hitIdx === 0) {
+                s.alive = false;
+              } else {
+                s.snake.pop();
+                if (s.snake.length === 0) s.alive = false;
+              }
+              // bump hunter back along its velocity
+              h.x -= (dx / (dist || 1)) * 0.6;
+              h.y -= (dy / (dist || 1)) * 0.6;
+            }
           }
         }
       }
 
-      // Auto-fire
+      // Auto-fire (targets hunters only — obstacles are inert)
       s.fireTimer += dt;
       if (s.fireTimer >= s.fireIntervalMs) {
         const head = s.snake[0];
@@ -327,17 +346,10 @@ function Game() {
             const py = cy + vy * t;
             if (!best || d2 < best.d2) best = { x: px, y: py, d2 };
           };
-          for (const e of s.enemies) {
-            const size = e.big ? 2 : 1;
-            consider(e.x + size / 2, e.y + size / 2);
-          }
           for (const h of s.hunters) {
-            const dx = head.x - h.x;
-            const dy = head.y - h.y;
-            const sx = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
-            const sy = Math.abs(dy) > Math.abs(dx) ? Math.sign(dy) : 0;
-            const hSpeed = 1 / 0.22;
-            consider(h.x + 0.5, h.y + 0.5, sx * hSpeed, sy * hSpeed);
+            const vx = Math.cos(h.angle) * HUNTER_SPEED;
+            const vy = Math.sin(h.angle) * HUNTER_SPEED;
+            consider(h.x + 0.5, h.y + 0.5, vx, vy);
           }
           if (best) {
             s.fireTimer = 0;
@@ -369,20 +381,6 @@ function Game() {
           p.x += p.vx * stepDt;
           p.y += p.vy * stepDt;
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
-          for (let i = 0; i < s.enemies.length; i++) {
-            const e = s.enemies[i];
-            const size = e.big ? 2 : 1;
-            if (p.x >= e.x - 0.1 && p.x < e.x + size + 0.1 && p.y >= e.y - 0.1 && p.y < e.y + size + 0.1) {
-              e.hp -= s.damage;
-              if (e.hp <= 0) {
-                s.score += e.big ? 25 : 10;
-                s.enemies.splice(i, 1);
-                const big = Math.random() < BIG_ENEMY_RATIO;
-                s.enemies.push({ ...randPos(), big, hp: big ? 2 : 1 });
-              }
-              return false;
-            }
-          }
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
             const dx = p.x - (h.x + 0.5);
@@ -390,7 +388,7 @@ function Game() {
             if (dx * dx + dy * dy <= HIT_R * HIT_R) {
               s.score += 15;
               s.hunters.splice(i, 1);
-              s.hunters.push({ ...randPos(), cooldown: 0 });
+              s.hunters.push({ ...randPos(), angle: 0, cooldown: 0 });
               return false;
             }
           }
@@ -480,32 +478,36 @@ function Game() {
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
       }
 
-      // enemies
-      for (const e of s.enemies) {
-        const size = e.big ? 2 : 1;
-        const px = e.x * CELL - camX;
-        const py = e.y * CELL - camY;
+      // obstacles (inert — block/damage on contact, can't be shot)
+      for (const o of s.obstacles) {
+        const size = o.big ? 2 : 1;
+        const px = o.x * CELL - camX;
+        const py = o.y * CELL - camY;
         if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
-        ctx.fillStyle = e.big ? "#b91c1c" : "#e0455e";
+        ctx.fillStyle = o.big ? "#5b5b6b" : "#6b6b7d";
         ctx.fillRect(px + 2, py + 2, size * CELL - 4, size * CELL - 4);
-        if (e.big && e.hp < 2) {
-          ctx.fillStyle = "#fca5a5";
-          ctx.fillRect(px + 4, py + 4, 4, 4);
-        }
+        ctx.strokeStyle = "#9a9aae";
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px + 3, py + 3, size * CELL - 6, size * CELL - 6);
       }
 
-      // hunters (triangles)
-      ctx.fillStyle = "#f97316";
+      // hunters (triangles rotated to facing direction)
       for (const h of s.hunters) {
-        const px = h.x * CELL - camX;
-        const py = h.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        const cx = h.x * CELL + CELL / 2 - camX;
+        const cy = h.y * CELL + CELL / 2 - camY;
+        if (cx < -CELL || cy < -CELL || cx > wViewW + CELL || cy > wViewH + CELL) continue;
+        ctx.save();
+        ctx.translate(cx, cy);
+        // sprite points "right" by default (+x); rotate by angle so nose follows velocity
+        ctx.rotate(h.angle);
+        ctx.fillStyle = "#f97316";
         ctx.beginPath();
-        ctx.moveTo(px + CELL / 2, py + 2);
-        ctx.lineTo(px + CELL - 2, py + CELL - 2);
-        ctx.lineTo(px + 2, py + CELL - 2);
+        ctx.moveTo(CELL / 2 - 2, 0);
+        ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
+        ctx.lineTo(-CELL / 2 + 2, -CELL / 2 + 2);
         ctx.closePath();
         ctx.fill();
+        ctx.restore();
       }
 
       // projectiles
