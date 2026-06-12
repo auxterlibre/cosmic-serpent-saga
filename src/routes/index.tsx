@@ -27,7 +27,7 @@ type Vec = { x: number; y: number };
 type Dir = Vec;
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
