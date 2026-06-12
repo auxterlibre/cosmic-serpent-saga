@@ -20,14 +20,14 @@ const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 25;
 const BIG_OBSTACLE_RATIO = 0.3;
 const HUNTER_COUNT = 8;
-const HUNTER_SPEED = 3.2;
+const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
 type Dir = Vec;
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Vec[] };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
