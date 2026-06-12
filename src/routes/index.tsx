@@ -282,34 +282,52 @@ function Game() {
       const s = stateRef.current;
       if (!s.alive || s.paused) return;
 
-      // Hunters move toward head
-      s.hunterTimer += dt;
-      const HUNTER_STEP_MS = 220;
-      while (s.hunterTimer >= HUNTER_STEP_MS) {
-        s.hunterTimer -= HUNTER_STEP_MS;
+      // Hunters move smoothly toward head
+      {
         const head = s.snake[0];
-        if (!head) break;
-        for (const h of s.hunters) {
-          const dx = head.x - h.x;
-          const dy = head.y - h.y;
-          if (Math.abs(dx) > Math.abs(dy)) h.x += Math.sign(dx);
-          else if (dy !== 0) h.y += Math.sign(dy);
-          else if (dx !== 0) h.x += Math.sign(dx);
-
-          const hitIdx = s.snake.findIndex((seg) => seg.x === h.x && seg.y === h.y);
-          if (hitIdx >= 0) {
-            if (hitIdx === 0) {
-              s.alive = false;
-            } else {
-              s.snake.pop();
-              if (s.snake.length === 0) s.alive = false;
+        if (head) {
+          const dtSec = dt / 1000;
+          const step = HUNTER_SPEED * dtSec;
+          const hx = head.x + 0.5;
+          const hy = head.y + 0.5;
+          for (const h of s.hunters) {
+            const dx = hx - (h.x + 0.5);
+            const dy = hy - (h.y + 0.5);
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.01) {
+              const nx = dx / dist;
+              const ny = dy / dist;
+              const move = Math.min(step, dist);
+              h.x += nx * move;
+              h.y += ny * move;
+              // smooth angle interpolation toward movement direction
+              const target = Math.atan2(ny, nx);
+              let diff = target - h.angle;
+              while (diff > Math.PI) diff -= Math.PI * 2;
+              while (diff < -Math.PI) diff += Math.PI * 2;
+              h.angle += diff * Math.min(1, dtSec * 8);
             }
-            h.x -= Math.sign(dx || 1);
+
+            // Collision with snake (cell-based)
+            const cx = Math.floor(h.x + 0.5);
+            const cy = Math.floor(h.y + 0.5);
+            const hitIdx = s.snake.findIndex((seg) => seg.x === cx && seg.y === cy);
+            if (hitIdx >= 0) {
+              if (hitIdx === 0) {
+                s.alive = false;
+              } else {
+                s.snake.pop();
+                if (s.snake.length === 0) s.alive = false;
+              }
+              // bump hunter back along its velocity
+              h.x -= (dx / (dist || 1)) * 0.6;
+              h.y -= (dy / (dist || 1)) * 0.6;
+            }
           }
         }
       }
 
-      // Auto-fire
+      // Auto-fire (targets hunters only — obstacles are inert)
       s.fireTimer += dt;
       if (s.fireTimer >= s.fireIntervalMs) {
         const head = s.snake[0];
@@ -328,17 +346,10 @@ function Game() {
             const py = cy + vy * t;
             if (!best || d2 < best.d2) best = { x: px, y: py, d2 };
           };
-          for (const e of s.enemies) {
-            const size = e.big ? 2 : 1;
-            consider(e.x + size / 2, e.y + size / 2);
-          }
           for (const h of s.hunters) {
-            const dx = head.x - h.x;
-            const dy = head.y - h.y;
-            const sx = Math.abs(dx) >= Math.abs(dy) ? Math.sign(dx) : 0;
-            const sy = Math.abs(dy) > Math.abs(dx) ? Math.sign(dy) : 0;
-            const hSpeed = 1 / 0.22;
-            consider(h.x + 0.5, h.y + 0.5, sx * hSpeed, sy * hSpeed);
+            const vx = Math.cos(h.angle) * HUNTER_SPEED;
+            const vy = Math.sin(h.angle) * HUNTER_SPEED;
+            consider(h.x + 0.5, h.y + 0.5, vx, vy);
           }
           if (best) {
             s.fireTimer = 0;
