@@ -87,6 +87,9 @@ function initialState() {
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
+    costFireRate: 2,
+    costDamage: 3,
+    costRange: 2,
     fireTimer: 0,
     hunterTimer: 0,
     paused: true,
@@ -107,6 +110,9 @@ function Game() {
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
+    costFireRate: 2,
+    costDamage: 3,
+    costRange: 2,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
@@ -188,7 +194,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
+    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8, costFireRate: 2, costDamage: 3, costRange: 2 });
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
@@ -227,20 +233,24 @@ function Game() {
   function buyFireRate() {
     const s = stateRef.current;
     if (s.fireIntervalMs <= 300) return;
-    if (!spendSegments(2)) return;
+    if (!spendSegments(s.costFireRate)) return;
     s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8));
+    s.costFireRate += 1;
     syncHud();
   }
   function buyDamage() {
-    if (!spendSegments(3)) return;
-    stateRef.current.damage += 1;
+    const s = stateRef.current;
+    if (!spendSegments(s.costDamage)) return;
+    s.damage += 1;
+    s.costDamage += 2;
     syncHud();
   }
   function buyRange() {
     const s = stateRef.current;
     if (s.fireRange >= 30) return;
-    if (!spendSegments(2)) return;
+    if (!spendSegments(s.costRange)) return;
     s.fireRange += 2;
+    s.costRange += 1;
     syncHud();
   }
   function syncHud() {
@@ -252,6 +262,9 @@ function Game() {
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
       fireRange: s.fireRange,
+      costFireRate: s.costFireRate,
+      costDamage: s.costDamage,
+      costRange: s.costRange,
     });
   }
 
@@ -764,26 +777,26 @@ function Game() {
             <div className="mt-4 space-y-2">
               <button
                 onClick={buyFireRate}
-                disabled={hud.length <= 2 || hud.fireIntervalMs <= 300}
+                disabled={hud.length <= hud.costFireRate || hud.fireIntervalMs <= 300}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Fire rate +20% — 2 segments
+                Fire rate +20% — {hud.costFireRate} segments
                 <div className="text-xs opacity-60">Current: {(hud.fireIntervalMs / 1000).toFixed(2)}s</div>
               </button>
               <button
                 onClick={buyDamage}
-                disabled={hud.length <= 3}
+                disabled={hud.length <= hud.costDamage}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Damage +1 — 3 segments
+                Damage +1 — {hud.costDamage} segments
                 <div className="text-xs opacity-60">Current: {hud.damage}</div>
               </button>
               <button
                 onClick={buyRange}
-                disabled={hud.length <= 2 || hud.fireRange >= 30}
+                disabled={hud.length <= hud.costRange || hud.fireRange >= 30}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Range +2 — 2 segments
+                Range +2 — {hud.costRange} segments
                 <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
               </button>
             </div>
