@@ -489,20 +489,17 @@ function Game() {
 
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
-        const size = o.big ? 2 : 1;
+        const size = 2;
         const cx = o.x + size / 2;
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
         const r = size / 2 + 0.3;
         if (dx * dx + dy * dy <= r * r) {
-          const shrink = o.big ? 2 : 1;
-          s.obstacles.splice(i, 1);
-          const big = Math.random() < BIG_OBSTACLE_RATIO;
-          s.obstacles.push({ ...randPosAway(head), big });
-          for (let k = 0; k < shrink; k++) if (s.snake.length > 0) s.snake.pop();
-          if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
-          hudDirty = true;
+          // Instant death on any asteroid hit.
+          s.alive = false;
+          syncHud();
+          return;
         }
       }
 
