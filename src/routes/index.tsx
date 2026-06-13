@@ -218,7 +218,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8, costFireRate: 2, costDamage: 3, costRange: 2 });
+    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8, costFireRate: 2, costDamage: 3, costRange: 2, scrap: 0, multishot: 1, costMultishot: 6, costRepair: 4 });
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
