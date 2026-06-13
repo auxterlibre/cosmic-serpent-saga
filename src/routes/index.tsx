@@ -192,7 +192,7 @@ function Game() {
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
-    length: 4,
+    length: 1,
     alive: true,
     fireIntervalMs: 2000,
     damage: 1,
