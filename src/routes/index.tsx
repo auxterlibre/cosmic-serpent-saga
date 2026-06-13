@@ -405,6 +405,8 @@ function Game() {
       lvlRange: s.lvlRange,
       lvlMultishot: s.lvlMultishot,
       lvlSpeed: s.lvlSpeed,
+      lvlCap: s.lvlCap,
+      segCap: s.segCap,
     });
   }
 
