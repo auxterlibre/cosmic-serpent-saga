@@ -69,23 +69,39 @@ function pickRarity(boost = 0): Rarity {
   }
   return "common";
 }
-function makeLootItem(boost = 0): Colored {
+function makeLootItem(boost = 0, awayFrom?: Vec): Colored {
   const r = pickRarity(boost);
-  return { ...randPos(), color: RARITY_INFO[r].color, rarity: r };
+  return { ...randPosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
 }
 
 function rand(n: number) { return Math.floor(Math.random() * n); }
 function randPos(): Vec { return { x: rand(WORLD_W), y: rand(WORLD_H) }; }
 
-function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem()); }
+// Spawn distance threshold — large enough to be off-screen on typical viewports.
+const SPAWN_MIN_DIST = 35;
+function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
+  if (!from) return randPos();
+  for (let i = 0; i < 60; i++) {
+    const p = randPos();
+    const dx = p.x - from.x, dy = p.y - from.y;
+    if (dx * dx + dy * dy >= minDist * minDist) return p;
+  }
+  return randPos();
+}
+
+// Player starts as just the head — no trailing segments.
+const INITIAL_LENGTH = 1;
+const START: Vec = { x: 50, y: 50 };
+
+function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 function makeObstacles(): Obstacle[] {
   return Array.from({ length: OBSTACLE_COUNT }, () => {
     const big = Math.random() < BIG_OBSTACLE_RATIO;
-    return { x: rand(WORLD_W), y: rand(WORLD_H), big };
+    return { ...randPosAway(START), big };
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -96,9 +112,19 @@ function makeCheckpoints(): Checkpoint[] {
 }
 
 function initialSnake(): Seg[] {
-  const arr: Seg[] = [];
-  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50, color: SEG_COLOR_DEFAULT });
-  return arr;
+  return [{ x: START.x, y: START.y, color: SEG_COLOR_DEFAULT }];
+}
+
+function computeInventory(snake: Seg[], growth: string[]): Cost {
+  const inv: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+  const tally = (color: string) => {
+    for (const r of RARITY_ORDER) {
+      if (RARITY_INFO[r].color === color) { inv[r]++; return; }
+    }
+  };
+  for (let i = INITIAL_LENGTH; i < snake.length; i++) tally(snake[i].color);
+  for (const c of growth) tally(c);
+  return inv;
 }
 
 // Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
