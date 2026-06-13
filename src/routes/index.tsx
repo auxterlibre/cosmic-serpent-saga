@@ -588,13 +588,20 @@ function Game() {
             const dy = b.y - head.y;
             const len = Math.hypot(dx, dy) || 1;
             const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
-            s.projectiles.push({
-              x: head.x,
-              y: head.y,
-              vx: (dx / len) * PROJ_SPEED,
-              vy: (dy / len) * PROJ_SPEED,
-              life: lifeMs,
-            });
+            const baseAngle = Math.atan2(dy, dx);
+            const shots = Math.max(1, s.multishot);
+            const spread = 0.18; // radians between adjacent shots
+            for (let si = 0; si < shots; si++) {
+              const offset = (si - (shots - 1) / 2) * spread;
+              const a = baseAngle + offset;
+              s.projectiles.push({
+                x: head.x,
+                y: head.y,
+                vx: Math.cos(a) * PROJ_SPEED,
+                vy: Math.sin(a) * PROJ_SPEED,
+                life: lifeMs,
+              });
+            }
           } else {
             s.fireTimer = s.fireIntervalMs;
           }
@@ -619,6 +626,18 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
+                // Drop stolen segments back as loot (collectable again)
+                for (const c of h.stolenColors) {
+                  const jitter = () => (Math.random() - 0.5) * 0.6;
+                  s.loot.push({ x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())), y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())), color: c });
+                }
+                // Drop scrap parts
+                const scrapCount = 1 + Math.floor(Math.random() * 3);
+                for (let k = 0; k < scrapCount; k++) {
+                  const ang = Math.random() * Math.PI * 2;
+                  const spd = 1 + Math.random() * 2;
+                  s.scraps.push({ x: h.x + 0.5, y: h.y + 0.5, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 15000 });
+                }
                 s.hunters.splice(i, 1);
                 s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
@@ -629,6 +648,19 @@ function Game() {
         p.life -= dt;
         return p.life > 0;
       });
+
+      // Scraps drift to rest with friction and decay
+      for (let i = s.scraps.length - 1; i >= 0; i--) {
+        const sc = s.scraps[i];
+        sc.x += sc.vx * dtSec;
+        sc.y += sc.vy * dtSec;
+        sc.vx *= Math.pow(0.001, dtSec);
+        sc.vy *= Math.pow(0.001, dtSec);
+        sc.life -= dt;
+        if (sc.life <= 0 || sc.x < 0 || sc.y < 0 || sc.x >= WORLD_W || sc.y >= WORLD_H) {
+          s.scraps.splice(i, 1);
+        }
+      }
     };
 
     const loop = (now: number) => {
