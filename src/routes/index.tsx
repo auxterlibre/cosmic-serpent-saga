@@ -797,12 +797,6 @@ function Game() {
         ctx.fillRect(px - 2, py - 2, 4, 4);
       }
 
-      // Snake — smooth rounded body
-      const R = CELL * 0.45;
-      for (let i = s.snake.length - 1; i >= 0; i--) {
-        const seg = s.snake[i];
-        const px = seg.x * CELL - camX;
-        const py = seg.y * CELL - camY;
       // Snake — segment color preserved from the loot that grew it
       const R = CELL * 0.45;
       for (let i = s.snake.length - 1; i >= 0; i--) {
