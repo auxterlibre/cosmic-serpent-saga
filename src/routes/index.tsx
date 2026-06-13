@@ -326,8 +326,8 @@ function Game() {
       for (let i = s.growth.length - 1; i >= 0 && need > 0; i--) {
         if (s.growth[i] === color) { s.growth.splice(i, 1); need--; }
       }
-      // Then remove from the tail end of the snake, preserving the first 4 default segments
-      for (let i = s.snake.length - 1; i >= 4 && need > 0; i--) {
+      // Then remove from the tail end of the snake, preserving the head.
+      for (let i = s.snake.length - 1; i >= INITIAL_LENGTH && need > 0; i--) {
         if (s.snake[i].color === color) { s.snake.splice(i, 1); need--; }
       }
     }
@@ -336,13 +336,14 @@ function Game() {
   function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed", apply: () => void) {
     const s = stateRef.current;
     const cost = costFor(s[lvlKey]);
-    if (!canAfford(s.inventory, cost)) return;
-    payCost(s.inventory, cost);
+    const inv = computeInventory(s.snake, s.growth);
+    if (!canAfford(inv, cost)) return;
     spendSegments(cost);
     apply();
     s[lvlKey] += 1;
     syncHud();
   }
+
 
   function buyFireRate() {
     const s = stateRef.current;
