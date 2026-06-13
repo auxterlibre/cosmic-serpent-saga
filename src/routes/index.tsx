@@ -19,8 +19,7 @@ const BASE_PLAYER_SPEED = 8.5; // cells per second
 const TURN_RATE = 8.5;
 const SEG_SPACING = 0.85;
 const LOOT_COUNT = 30;
-const OBSTACLE_COUNT = 25;
-const BIG_OBSTACLE_RATIO = 0.3;
+const OBSTACLE_COUNT = 18;
 const HUNTER_COUNT = 8;
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
@@ -29,7 +28,7 @@ type Rarity = "common" | "uncommon" | "rare" | "epic";
 type Vec = { x: number; y: number };
 type Colored = { x: number; y: number; color: string; rarity: Rarity };
 
-type Obstacle = { x: number; y: number; big: boolean };
+type Obstacle = { x: number; y: number };
 type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
@@ -95,10 +94,7 @@ const START: Vec = { x: 50, y: 50 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 function makeObstacles(): Obstacle[] {
-  return Array.from({ length: OBSTACLE_COUNT }, () => {
-    const big = Math.random() < BIG_OBSTACLE_RATIO;
-    return { ...randPosAway(START), big };
-  });
+  return Array.from({ length: OBSTACLE_COUNT }, () => ({ ...randPosAway(START) }));
 }
 function makeHunters(): Hunter[] {
   return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
@@ -369,6 +365,22 @@ function Game() {
     tryBuy("lvlSpeed", () => { s.playerSpeed = Math.min(BASE_PLAYER_SPEED * 2, s.playerSpeed + 0.8); });
   }
 
+  // Crafting: 3 of a lower rarity -> 1 of the next rarity up.
+  const CRAFT_COST = 3;
+  function tryCraft(from: Rarity) {
+    const idx = RARITY_ORDER.indexOf(from);
+    if (idx < 0 || idx >= RARITY_ORDER.length - 1) return;
+    const to = RARITY_ORDER[idx + 1];
+    const s = stateRef.current;
+    const inv = computeInventory(s.snake, s.growth);
+    if (inv[from] < CRAFT_COST) return;
+    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    cost[from] = CRAFT_COST;
+    spendSegments(cost);
+    s.growth.push(RARITY_INFO[to].color);
+    syncHud();
+  }
+
   function syncHud() {
     const s = stateRef.current;
     setHud({
@@ -493,20 +505,17 @@ function Game() {
 
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
-        const size = o.big ? 2 : 1;
+        const size = 2;
         const cx = o.x + size / 2;
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
         const r = size / 2 + 0.3;
         if (dx * dx + dy * dy <= r * r) {
-          const shrink = o.big ? 2 : 1;
-          s.obstacles.splice(i, 1);
-          const big = Math.random() < BIG_OBSTACLE_RATIO;
-          s.obstacles.push({ ...randPosAway(head), big });
-          for (let k = 0; k < shrink; k++) if (s.snake.length > 0) s.snake.pop();
-          if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
-          hudDirty = true;
+          // Instant death on any asteroid hit.
+          s.alive = false;
+          syncHud();
+          return;
         }
       }
 
@@ -715,8 +724,19 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
-                // Hunters only drop scrap parts. Any segments they stole are lost.
+                // Hunters drop scrap parts on death.
                 s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
+                // If they were carrying stolen segments, scatter them as loot.
+                for (const st of h.stolen) {
+                  const jx = (Math.random() - 0.5) * 2;
+                  const jy = (Math.random() - 0.5) * 2;
+                  s.loot.push({
+                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jx)),
+                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jy)),
+                    color: st.color,
+                    rarity: st.rarity,
+                  });
+                }
                 s.hunters.splice(i, 1);
                 s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
                 syncHud();
@@ -828,13 +848,13 @@ function Game() {
       }
 
       for (const o of s.obstacles) {
-        const size = o.big ? 2 : 1;
+        const size = 2;
         const px = o.x * CELL - camX;
         const py = o.y * CELL - camY;
         if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
-        ctx.fillStyle = o.big ? "#5b5b6b" : "#6b6b7d";
+        ctx.fillStyle = "#5b5b6b";
         ctx.fillRect(px + 2, py + 2, size * CELL - 4, size * CELL - 4);
-        ctx.strokeStyle = "#9a9aae";
+        ctx.strokeStyle = "#c44";
         ctx.lineWidth = 1;
         ctx.strokeRect(px + 3, py + 3, size * CELL - 6, size * CELL - 6);
       }
@@ -1008,9 +1028,9 @@ function Game() {
 
       {shop.open && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-sm rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
+          <div className="w-full max-w-3xl rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade. Higher-tier upgrades demand rarer loot.</div>
+            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade, or craft lesser loot into rarer pieces.</div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {RARITY_ORDER.map((r) => (
@@ -1027,41 +1047,78 @@ function Game() {
               </span>
             </div>
 
-            <div className="mt-4 space-y-2">
-              <UpgradeButton
-                onClick={buyFireRate}
-                level={hud.lvlFireRate}
-                label="Fire rate +20%"
-                current={`${(hud.fireIntervalMs / 1000).toFixed(2)}s between volleys`}
-                maxed={hud.fireIntervalMs <= 300}
-              />
-              <UpgradeButton
-                onClick={buyDamage}
-                level={hud.lvlDamage}
-                label="Damage +1"
-                current={`Current: ${hud.damage}`}
-              />
-              <UpgradeButton
-                onClick={buyRange}
-                level={hud.lvlRange}
-                label="Range +2"
-                current={`Current: ${hud.fireRange} cells`}
-                maxed={hud.fireRange >= 30}
-              />
-              <UpgradeButton
-                onClick={buyMultishot}
-                level={hud.lvlMultishot}
-                label="Multi-target +1"
-                current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
-                maxed={hud.multishot >= 6}
-              />
-              <UpgradeButton
-                onClick={buySpeed}
-                level={hud.lvlSpeed}
-                label="Ship speed +"
-                current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
-                maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
-              />
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <div className="mb-2 text-xs uppercase tracking-wide opacity-70">Upgrades</div>
+                <div className="space-y-2">
+                  <UpgradeButton
+                    onClick={buyFireRate}
+                    level={hud.lvlFireRate}
+                    label="Fire rate +20%"
+                    current={`${(hud.fireIntervalMs / 1000).toFixed(2)}s between volleys`}
+                    maxed={hud.fireIntervalMs <= 300}
+                  />
+                  <UpgradeButton
+                    onClick={buyDamage}
+                    level={hud.lvlDamage}
+                    label="Damage +1"
+                    current={`Current: ${hud.damage}`}
+                  />
+                  <UpgradeButton
+                    onClick={buyRange}
+                    level={hud.lvlRange}
+                    label="Range +2"
+                    current={`Current: ${hud.fireRange} cells`}
+                    maxed={hud.fireRange >= 30}
+                  />
+                  <UpgradeButton
+                    onClick={buyMultishot}
+                    level={hud.lvlMultishot}
+                    label="Multi-target +1"
+                    current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
+                    maxed={hud.multishot >= 6}
+                  />
+                  <UpgradeButton
+                    onClick={buySpeed}
+                    level={hud.lvlSpeed}
+                    label="Ship speed +"
+                    current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
+                    maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs uppercase tracking-wide opacity-70">Craft</div>
+                <div className="space-y-2">
+                  {RARITY_ORDER.slice(0, -1).map((from, i) => {
+                    const to = RARITY_ORDER[i + 1];
+                    const have = hud.inventory[from];
+                    const afford = have >= CRAFT_COST;
+                    const fromInfo = RARITY_INFO[from];
+                    const toInfo = RARITY_INFO[to];
+                    return (
+                      <button
+                        key={from}
+                        onClick={() => tryCraft(from)}
+                        disabled={!afford}
+                        className="w-full rounded bg-fuchsia-500/10 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/20 disabled:opacity-40"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
+                            <span style={{ color: fromInfo.color }}>{CRAFT_COST} {from}</span>
+                            <span className="opacity-60">→</span>
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
+                            <span style={{ color: toInfo.color }}>1 {to}</span>
+                          </span>
+                          <span className="text-[11px] opacity-60">have {have}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <button
               onClick={closeShop}
