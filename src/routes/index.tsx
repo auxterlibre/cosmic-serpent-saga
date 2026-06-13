@@ -141,6 +141,7 @@ function initialState() {
     alive: true,
     score: 0,
     inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
+    scrap: 0,
     // Upgrade levels (number of times bought; affects next cost)
     lvlFireRate: 1,
     lvlDamage: 1,
@@ -177,6 +178,7 @@ function Game() {
     multishot: 1,
     playerSpeed: BASE_PLAYER_SPEED,
     inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
+    scrap: 0,
     lvlFireRate: 1,
     lvlDamage: 1,
     lvlRange: 1,
@@ -338,6 +340,7 @@ function Game() {
       multishot: s.multishot,
       playerSpeed: s.playerSpeed,
       inventory: { ...s.inventory },
+      scrap: s.scrap,
       lvlFireRate: s.lvlFireRate,
       lvlDamage: s.lvlDamage,
       lvlRange: s.lvlRange,
@@ -402,6 +405,36 @@ function Game() {
       const hx = head.x;
       const hy = head.y;
       const PICK = 1.2;
+
+      // Self-collision: if the head bites its own body, all segments from the
+      // bitten one onward detach and scatter as loot the player can collect again.
+      {
+        const SELF_HIT = 0.7;
+        const SELF_HIT2 = SELF_HIT * SELF_HIT;
+        // Skip the first few segments — they naturally trail right behind the head.
+        for (let i = 4; i < s.snake.length; i++) {
+          const seg = s.snake[i];
+          const dx = seg.x - hx;
+          const dy = seg.y - hy;
+          if (dx * dx + dy * dy <= SELF_HIT2) {
+            const detached = s.snake.splice(i);
+            for (const d of detached) {
+              let rar: Rarity = "common";
+              for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === d.color) { rar = r; break; }
+              const jx = (Math.random() - 0.5) * 1.2;
+              const jy = (Math.random() - 0.5) * 1.2;
+              s.loot.push({
+                x: Math.max(0, Math.min(WORLD_W - 1, d.x + jx)),
+                y: Math.max(0, Math.min(WORLD_H - 1, d.y + jy)),
+                color: d.color,
+                rarity: rar,
+              });
+            }
+            break;
+          }
+        }
+      }
+
 
       let hudDirty = false;
       for (let i = s.loot.length - 1; i >= 0; i--) {
@@ -556,12 +589,14 @@ function Game() {
               syncHud();
               continue;
             } else if (hitIdx > 0) {
-              const stolenSeg = s.snake.splice(hitIdx, 1)[0];
-              h.hp += 1;
-              // Find matching rarity from color (default common)
-              let rar: Rarity = "common";
-              for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === stolenSeg.color) { rar = r; break; }
-              h.stolen.unshift({ color: stolenSeg.color, rarity: rar });
+              // Grab the bitten segment AND every segment after it; they become the hunter's tail.
+              const taken = s.snake.splice(hitIdx);
+              for (const seg of taken) {
+                let rar: Rarity = "common";
+                for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === seg.color) { rar = r; break; }
+                // Push in body order so closest-to-head ends up first in stolen (head of hunter's tail).
+                h.stolen.push({ color: seg.color, rarity: rar });
+              }
               h.cooldown = 400;
               h.fleeing = true;
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
@@ -640,29 +675,11 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
-                // Drop stolen segments back as loot with original rarity
-                for (const st of h.stolen) {
-                  const jitter = () => (Math.random() - 0.5) * 0.6;
-                  s.loot.push({
-                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())),
-                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())),
-                    color: st.color,
-                    rarity: st.rarity,
-                  });
-                }
-                // Bonus drop: a single piece of loot biased toward higher rarities
-                {
-                  const jitter = () => (Math.random() - 0.5) * 0.6;
-                  const r = pickRarity(0.6);
-                  s.loot.push({
-                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())),
-                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())),
-                    color: RARITY_INFO[r].color,
-                    rarity: r,
-                  });
-                }
+                // Hunters only drop scrap parts. Any segments they stole are lost.
+                s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
                 s.hunters.splice(i, 1);
                 s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                syncHud();
               }
               return false;
             }
@@ -963,6 +980,11 @@ function Game() {
                   {r}: {hud.inventory[r]}
                 </span>
               ))}
+              <span className="inline-flex items-center gap-1 rounded px-2 py-1"
+                style={{ backgroundColor: "#f59e0b1f", border: "1px solid #f59e0b55", color: "#f59e0b" }}>
+                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />
+                scrap: {hud.scrap}
+              </span>
             </div>
 
             <div className="mt-4 space-y-2">
