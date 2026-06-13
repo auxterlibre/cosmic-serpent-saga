@@ -334,7 +334,7 @@ function Game() {
     }
   }
 
-  function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed", apply: () => void) {
+  function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed" | "lvlCap", apply: () => void) {
     const s = stateRef.current;
     const cost = costFor(s[lvlKey]);
     const inv = computeInventory(s.snake, s.growth);
