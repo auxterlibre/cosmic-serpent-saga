@@ -110,6 +110,9 @@ function Game() {
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
+    costFireRate: 2,
+    costDamage: 3,
+    costRange: 2,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
