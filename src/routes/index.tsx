@@ -233,20 +233,24 @@ function Game() {
   function buyFireRate() {
     const s = stateRef.current;
     if (s.fireIntervalMs <= 300) return;
-    if (!spendSegments(2)) return;
+    if (!spendSegments(s.costFireRate)) return;
     s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8));
+    s.costFireRate += 1;
     syncHud();
   }
   function buyDamage() {
-    if (!spendSegments(3)) return;
-    stateRef.current.damage += 1;
+    const s = stateRef.current;
+    if (!spendSegments(s.costDamage)) return;
+    s.damage += 1;
+    s.costDamage += 2;
     syncHud();
   }
   function buyRange() {
     const s = stateRef.current;
     if (s.fireRange >= 30) return;
-    if (!spendSegments(2)) return;
+    if (!spendSegments(s.costRange)) return;
     s.fireRange += 2;
+    s.costRange += 1;
     syncHud();
   }
   function syncHud() {
@@ -258,6 +262,9 @@ function Game() {
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
       fireRange: s.fireRange,
+      costFireRate: s.costFireRate,
+      costDamage: s.costDamage,
+      costRange: s.costRange,
     });
   }
 
