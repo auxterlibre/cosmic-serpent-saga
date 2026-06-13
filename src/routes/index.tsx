@@ -365,6 +365,22 @@ function Game() {
     tryBuy("lvlSpeed", () => { s.playerSpeed = Math.min(BASE_PLAYER_SPEED * 2, s.playerSpeed + 0.8); });
   }
 
+  // Crafting: 3 of a lower rarity -> 1 of the next rarity up.
+  const CRAFT_COST = 3;
+  function tryCraft(from: Rarity) {
+    const idx = RARITY_ORDER.indexOf(from);
+    if (idx < 0 || idx >= RARITY_ORDER.length - 1) return;
+    const to = RARITY_ORDER[idx + 1];
+    const s = stateRef.current;
+    const inv = computeInventory(s.snake, s.growth);
+    if (inv[from] < CRAFT_COST) return;
+    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    cost[from] = CRAFT_COST;
+    spendSegments(cost);
+    s.growth.push(RARITY_INFO[to].color);
+    syncHud();
+  }
+
   function syncHud() {
     const s = stateRef.current;
     setHud({
