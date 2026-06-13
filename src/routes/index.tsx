@@ -94,10 +94,7 @@ const START: Vec = { x: 50, y: 50 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 function makeObstacles(): Obstacle[] {
-  return Array.from({ length: OBSTACLE_COUNT }, () => {
-    const big = Math.random() < BIG_OBSTACLE_RATIO;
-    return { ...randPosAway(START), big };
-  });
+  return Array.from({ length: OBSTACLE_COUNT }, () => ({ ...randPosAway(START) }));
 }
 function makeHunters(): Hunter[] {
   return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
