@@ -715,7 +715,7 @@ function Game() {
 
             <div className="mt-5 text-sm font-semibold text-cyan-300">HOW TO PLAY</div>
             <ul className="mt-2 space-y-2 text-sm">
-              <li>👆 <span className="opacity-80">Swipe</span> in any direction to steer smoothly</li>
+              <li>👆 <span className="opacity-80">Touch & drag</span> anywhere — ship aims toward your finger (360°)</li>
               <li>⌨️ <span className="opacity-80">Arrows or WASD</span> on keyboard</li>
               <li>💛 Collect loot to grow longer</li>
               <li>🟧 Hunters chase you — you auto-fire at them</li>
