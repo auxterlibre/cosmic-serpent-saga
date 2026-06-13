@@ -1186,13 +1186,13 @@ function Game() {
       <button
         onClick={onClick}
         disabled={disabled || maxed || !afford}
-        className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
+        className="w-full rounded bg-fuchsia-500/20 px-2 py-1.5 text-left text-xs hover:bg-fuchsia-500/30 disabled:opacity-40 sm:px-3 sm:py-2 sm:text-sm"
       >
         <div className="flex items-center justify-between gap-2">
           <span>{label} <span className="opacity-50">L{level}</span></span>
-          {maxed ? <span className="text-[11px] opacity-60">MAX</span> : renderCost(cost)}
+          {maxed ? <span className="text-[10px] opacity-60 sm:text-[11px]">MAX</span> : renderCost(cost)}
         </div>
-        <div className="text-xs opacity-60">{current}</div>
+        <div className="text-[10px] opacity-60 sm:text-xs">{current}</div>
       </button>
     );
   };
@@ -1253,10 +1253,10 @@ function Game() {
       )}
 
       {shop.open && hud.alive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-3xl rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
-            <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade, or craft lesser loot into rarer pieces.</div>
+        <div className="absolute inset-0 flex items-stretch justify-center overflow-y-auto bg-black/60 p-2 sm:items-center sm:p-4">
+          <div className="my-auto max-h-full w-full max-w-3xl overflow-y-auto rounded-lg border border-fuchsia-500/40 bg-[#100820] px-3 py-3 font-mono text-fuchsia-100 sm:px-6 sm:py-5">
+            <div className="text-base sm:text-xl">CHECKPOINT</div>
+            <div className="mt-1 text-[11px] opacity-70 sm:text-xs">Spend loot to upgrade, or craft lesser loot into rarer pieces.</div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {RARITY_ORDER.map((r) => (
@@ -1277,9 +1277,9 @@ function Game() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div>
-                <div className="mb-2 text-xs uppercase tracking-wide opacity-70">Upgrades</div>
+                <div className="mb-2 text-[11px] uppercase tracking-wide opacity-70 sm:text-xs">Upgrades</div>
                 <div className="space-y-2">
                   <UpgradeButton
                     onClick={buyFireRate}
