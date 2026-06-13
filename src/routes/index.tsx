@@ -26,17 +26,26 @@ const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
+type Colored = { x: number; y: number; color: string };
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Vec[]; fleeing: boolean; fleeTarget: Vec | null };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Colored[]; stolenColors: string[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
+type Scrap = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
+type Seg = { x: number; y: number; color: string };
 
-const KEY_ANGLE: Record<string, number> = {
-  ArrowUp: -Math.PI / 2, ArrowDown: Math.PI / 2, ArrowLeft: Math.PI, ArrowRight: 0,
-  w: -Math.PI / 2, s: Math.PI / 2, a: Math.PI, d: 0,
-  W: -Math.PI / 2, S: Math.PI / 2, A: Math.PI, D: 0,
+// Direction vectors for keyboard (combine for diagonals)
+const KEY_DIR: Record<string, { x: number; y: number }> = {
+  ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
+  w: { x: 0, y: -1 }, s: { x: 0, y: 1 }, a: { x: -1, y: 0 }, d: { x: 1, y: 0 },
+  W: { x: 0, y: -1 }, S: { x: 0, y: 1 }, A: { x: -1, y: 0 }, D: { x: 1, y: 0 },
 };
+
+const SEG_COLOR_DEFAULT = "#3aa8b8";
+const LOOT_PALETTE = ["#f5d142", "#7df9ff", "#a855f7", "#ff7fb6", "#5dffa0", "#ffa64d"];
+const pickLootColor = () => LOOT_PALETTE[Math.floor(Math.random() * LOOT_PALETTE.length)];
 
 function rand(n: number) {
   return Math.floor(Math.random() * n);
@@ -45,8 +54,8 @@ function randPos(): Vec {
   return { x: rand(WORLD_W), y: rand(WORLD_H) };
 }
 
-function makeLoot(): Vec[] {
-  return Array.from({ length: LOOT_COUNT }, randPos);
+function makeLoot(): Colored[] {
+  return Array.from({ length: LOOT_COUNT }, () => ({ ...randPos(), color: pickLootColor() }));
 }
 function makeObstacles(): Obstacle[] {
   return Array.from({ length: OBSTACLE_COUNT }, () => {
@@ -55,7 +64,7 @@ function makeObstacles(): Obstacle[] {
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -65,9 +74,9 @@ function makeCheckpoints(): Checkpoint[] {
   return cps;
 }
 
-function initialSnake(): Vec[] {
-  const arr: Vec[] = [];
-  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50 });
+function initialSnake(): Seg[] {
+  const arr: Seg[] = [];
+  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50, color: SEG_COLOR_DEFAULT });
   return arr;
 }
 
@@ -76,26 +85,32 @@ function initialState() {
     snake: initialSnake(),
     headAngle: 0,
     targetAngle: 0,
-    growth: 0,
+    growth: [] as string[], // colors of pending segments to append
     loot: makeLoot(),
     obstacles: makeObstacles(),
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
+    scraps: [] as Scrap[],
     alive: true,
     score: 0,
+    scrap: 0,
+    multishot: 1,
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
     costFireRate: 2,
     costDamage: 3,
     costRange: 2,
+    costMultishot: 6,
+    costRepair: 4,
     fireTimer: 0,
     hunterTimer: 0,
     paused: true,
     shopOpen: false,
     cpCooldown: new Set<number>(),
     manualPause: true,
+    keys: new Set<string>(),
   };
 }
 
@@ -113,23 +128,32 @@ function Game() {
     costFireRate: 2,
     costDamage: 3,
     costRange: 2,
+    scrap: 0,
+    multishot: 1,
+    costMultishot: 6,
+    costRepair: 4,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
 
-  // Input
+  // Input — track held keys; updatePlayer combines them each frame for diagonals.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R") { reset(); return; }
       if (e.key === "Escape") { closeShop(); return; }
       if (e.key === "p" || e.key === "P") { togglePause(); return; }
-      const a = KEY_ANGLE[e.key];
-      if (a === undefined) return;
-      stateRef.current.targetAngle = a;
+      if (KEY_DIR[e.key]) stateRef.current.keys.add(e.key);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (KEY_DIR[e.key]) stateRef.current.keys.delete(e.key);
     };
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); };
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
 
   // Touch/drag steering: while a pointer is down, the ship continuously
@@ -194,7 +218,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8, costFireRate: 2, costDamage: 3, costRange: 2 });
+    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8, costFireRate: 2, costDamage: 3, costRange: 2, scrap: 0, multishot: 1, costMultishot: 6, costRepair: 4 });
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
@@ -253,6 +277,22 @@ function Game() {
     s.costRange += 1;
     syncHud();
   }
+  function buyMultishot() {
+    const s = stateRef.current;
+    if (s.scrap < s.costMultishot) return;
+    s.scrap -= s.costMultishot;
+    s.multishot += 1;
+    s.costMultishot += 4;
+    syncHud();
+  }
+  function buyRepair() {
+    const s = stateRef.current;
+    if (s.scrap < s.costRepair) return;
+    s.scrap -= s.costRepair;
+    const tail = s.snake[s.snake.length - 1];
+    s.snake.push({ x: tail.x, y: tail.y, color: SEG_COLOR_DEFAULT });
+    syncHud();
+  }
   function syncHud() {
     const s = stateRef.current;
     setHud({
@@ -265,6 +305,10 @@ function Game() {
       costFireRate: s.costFireRate,
       costDamage: s.costDamage,
       costRange: s.costRange,
+      scrap: s.scrap,
+      multishot: s.multishot,
+      costMultishot: s.costMultishot,
+      costRepair: s.costRepair,
     });
   }
 
@@ -277,6 +321,16 @@ function Game() {
       const s = stateRef.current;
       if (!s.alive || s.paused) return;
       const dtSec = dt / 1000;
+
+      // Keyboard: combine held direction keys into a single vector (diagonals work).
+      if (s.keys.size > 0) {
+        let kx = 0, ky = 0;
+        for (const k of s.keys) {
+          const v = KEY_DIR[k];
+          if (v) { kx += v.x; ky += v.y; }
+        }
+        if (kx !== 0 || ky !== 0) s.targetAngle = Math.atan2(ky, kx);
+      }
 
       // Smooth angle steering toward target
       let diff = s.targetAngle - s.headAngle;
@@ -311,11 +365,11 @@ function Game() {
         }
       }
 
-      // Grow: append at tail when growth is pending
-      if (s.growth > 0 && s.snake.length > 0) {
+      // Grow: append pending segments at tail, preserving their color
+      while (s.growth.length > 0 && s.snake.length > 0) {
         const tail = s.snake[s.snake.length - 1];
-        s.snake.push({ x: tail.x, y: tail.y });
-        s.growth -= 1;
+        const color = s.growth.shift()!;
+        s.snake.push({ x: tail.x, y: tail.y, color });
       }
 
       const hx = head.x;
@@ -329,10 +383,24 @@ function Game() {
         const dx = (l.x + 0.5) - hx;
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
+          const color = l.color;
           s.loot.splice(i, 1);
-          s.loot.push(randPos());
+          // Respawn fresh loot somewhere else with a new random color
+          s.loot.push({ ...randPos(), color: pickLootColor() });
           s.score += 10;
-          s.growth += 1;
+          s.growth.push(color);
+          hudDirty = true;
+        }
+      }
+
+      // Scrap collisions
+      for (let i = s.scraps.length - 1; i >= 0; i--) {
+        const sc = s.scraps[i];
+        const dx = sc.x - hx;
+        const dy = sc.y - hy;
+        if (dx * dx + dy * dy <= PICK * PICK) {
+          s.scraps.splice(i, 1);
+          s.scrap += 1;
           hudDirty = true;
         }
       }
@@ -432,10 +500,16 @@ function Game() {
 
             const last0 = h.trail[0];
             if (!last0 || Math.hypot(h.x - last0.x, h.y - last0.y) >= 1) {
-              h.trail.unshift({ x: h.x, y: h.y });
+              const cIdx = h.trail.length;
+              const color = h.stolenColors[cIdx] ?? SEG_COLOR_DEFAULT;
+              h.trail.unshift({ x: h.x, y: h.y, color });
             }
-            const maxTrail = Math.max(0, h.hp - 1);
+            const maxTrail = Math.max(0, h.stolenColors.length);
             if (h.trail.length > maxTrail) h.trail.length = maxTrail;
+            // Refresh trail colors so they match stolenColors order
+            for (let ti = 0; ti < h.trail.length; ti++) {
+              h.trail[ti].color = h.stolenColors[ti] ?? SEG_COLOR_DEFAULT;
+            }
           }
 
           if (h.fleeing) {
@@ -443,7 +517,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
             }
             continue;
@@ -465,13 +539,14 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
               syncHud();
               continue;
             } else if (hitIdx > 0) {
-              s.snake.splice(hitIdx, 1);
+              const stolen = s.snake.splice(hitIdx, 1)[0];
               h.hp += 1;
+              h.stolenColors.unshift(stolen.color);
               h.cooldown = 400;
               h.fleeing = true;
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
@@ -513,13 +588,20 @@ function Game() {
             const dy = b.y - head.y;
             const len = Math.hypot(dx, dy) || 1;
             const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
-            s.projectiles.push({
-              x: head.x,
-              y: head.y,
-              vx: (dx / len) * PROJ_SPEED,
-              vy: (dy / len) * PROJ_SPEED,
-              life: lifeMs,
-            });
+            const baseAngle = Math.atan2(dy, dx);
+            const shots = Math.max(1, s.multishot);
+            const spread = 0.18; // radians between adjacent shots
+            for (let si = 0; si < shots; si++) {
+              const offset = (si - (shots - 1) / 2) * spread;
+              const a = baseAngle + offset;
+              s.projectiles.push({
+                x: head.x,
+                y: head.y,
+                vx: Math.cos(a) * PROJ_SPEED,
+                vy: Math.sin(a) * PROJ_SPEED,
+                life: lifeMs,
+              });
+            }
           } else {
             s.fireTimer = s.fireIntervalMs;
           }
@@ -544,8 +626,20 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
+                // Drop stolen segments back as loot (collectable again)
+                for (const c of h.stolenColors) {
+                  const jitter = () => (Math.random() - 0.5) * 0.6;
+                  s.loot.push({ x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())), y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())), color: c });
+                }
+                // Drop scrap parts
+                const scrapCount = 1 + Math.floor(Math.random() * 3);
+                for (let k = 0; k < scrapCount; k++) {
+                  const ang = Math.random() * Math.PI * 2;
+                  const spd = 1 + Math.random() * 2;
+                  s.scraps.push({ x: h.x + 0.5, y: h.y + 0.5, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 15000 });
+                }
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
               return false;
             }
@@ -554,6 +648,19 @@ function Game() {
         p.life -= dt;
         return p.life > 0;
       });
+
+      // Scraps drift to rest with friction and decay
+      for (let i = s.scraps.length - 1; i >= 0; i--) {
+        const sc = s.scraps[i];
+        sc.x += sc.vx * dtSec;
+        sc.y += sc.vy * dtSec;
+        sc.vx *= Math.pow(0.001, dtSec);
+        sc.vy *= Math.pow(0.001, dtSec);
+        sc.life -= dt;
+        if (sc.life <= 0 || sc.x < 0 || sc.y < 0 || sc.x >= WORLD_W || sc.y >= WORLD_H) {
+          s.scraps.splice(i, 1);
+        }
+      }
     };
 
     const loop = (now: number) => {
@@ -620,12 +727,25 @@ function Game() {
         ctx.fillText("$", px + 7, py + 14);
       }
 
-      ctx.fillStyle = "#f5d142";
       for (const l of s.loot) {
         const px = l.x * CELL - camX;
         const py = l.y * CELL - camY;
         if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        ctx.fillStyle = l.color;
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
+      }
+
+      // Scrap parts — small metallic shards
+      for (const sc of s.scraps) {
+        const px = sc.x * CELL - camX;
+        const py = sc.y * CELL - camY;
+        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        const alpha = Math.min(1, sc.life / 2000);
+        ctx.fillStyle = `rgba(180, 200, 220, ${alpha})`;
+        ctx.fillRect(px - 3, py - 3, 6, 6);
+        ctx.strokeStyle = `rgba(240, 245, 255, ${alpha})`;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px - 3, py - 3, 6, 6);
       }
 
       for (const o of s.obstacles) {
@@ -648,8 +768,13 @@ function Game() {
         for (const t of h.trail) {
           const tx = t.x * CELL + CELL / 2 - camX;
           const ty = t.y * CELL + CELL / 2 - camY;
-          ctx.fillStyle = "#b14a1a";
-          ctx.fillRect(tx - CELL / 2 + 1, ty - CELL / 2 + 1, CELL - 2, CELL - 2);
+          ctx.fillStyle = t.color;
+          ctx.beginPath();
+          ctx.arc(tx, ty, CELL * 0.42, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.35)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
 
         ctx.save();
@@ -672,13 +797,13 @@ function Game() {
         ctx.fillRect(px - 2, py - 2, 4, 4);
       }
 
-      // Snake — smooth rounded body
+      // Snake — segment color preserved from the loot that grew it
       const R = CELL * 0.45;
       for (let i = s.snake.length - 1; i >= 0; i--) {
         const seg = s.snake[i];
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
-        ctx.fillStyle = i === 0 ? "#7df9ff" : "#3aa8b8";
+        ctx.fillStyle = i === 0 ? "#7df9ff" : seg.color;
         ctx.beginPath();
         ctx.arc(px, py, R, 0, Math.PI * 2);
         ctx.fill();
@@ -772,8 +897,11 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-sm rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend segments to upgrade. Segments = health — don't drop to 0!</div>
-            <div className="mt-4 text-sm">Segments: <span className="text-cyan-300">{hud.length}</span></div>
+            <div className="mt-1 text-xs opacity-70">Spend segments or scrap to upgrade. Segments = health — don't drop to 0!</div>
+            <div className="mt-4 flex justify-between text-sm">
+              <div>Segments: <span className="text-cyan-300">{hud.length}</span></div>
+              <div>Scrap: <span className="text-slate-200">⚙ {hud.scrap}</span></div>
+            </div>
             <div className="mt-4 space-y-2">
               <button
                 onClick={buyFireRate}
@@ -798,6 +926,23 @@ function Game() {
               >
                 Range +2 — {hud.costRange} segments
                 <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
+              </button>
+              <div className="pt-2 text-xs uppercase tracking-wider opacity-60">Build with scrap ⚙</div>
+              <button
+                onClick={buyMultishot}
+                disabled={hud.scrap < hud.costMultishot}
+                className="w-full rounded bg-slate-400/20 px-3 py-2 text-left text-sm hover:bg-slate-400/30 disabled:opacity-40"
+              >
+                Multi-shot +1 — {hud.costMultishot} ⚙
+                <div className="text-xs opacity-60">Current: {hud.multishot} projectile{hud.multishot > 1 ? "s" : ""} per shot</div>
+              </button>
+              <button
+                onClick={buyRepair}
+                disabled={hud.scrap < hud.costRepair}
+                className="w-full rounded bg-slate-400/20 px-3 py-2 text-left text-sm hover:bg-slate-400/30 disabled:opacity-40"
+              >
+                Hull repair +1 segment — {hud.costRepair} ⚙
+                <div className="text-xs opacity-60">Restores a body segment</div>
               </button>
             </div>
             <button
