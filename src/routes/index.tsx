@@ -128,23 +128,32 @@ function Game() {
     costFireRate: 2,
     costDamage: 3,
     costRange: 2,
+    scrap: 0,
+    multishot: 1,
+    costMultishot: 6,
+    costRepair: 4,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
 
-  // Input
+  // Input — track held keys; updatePlayer combines them each frame for diagonals.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R") { reset(); return; }
       if (e.key === "Escape") { closeShop(); return; }
       if (e.key === "p" || e.key === "P") { togglePause(); return; }
-      const a = KEY_ANGLE[e.key];
-      if (a === undefined) return;
-      stateRef.current.targetAngle = a;
+      if (KEY_DIR[e.key]) stateRef.current.keys.add(e.key);
+    };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (KEY_DIR[e.key]) stateRef.current.keys.delete(e.key);
     };
     window.addEventListener("keydown", onKey);
-    return () => { window.removeEventListener("keydown", onKey); };
+    window.addEventListener("keyup", onKeyUp);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+    };
   }, []);
 
   // Touch/drag steering: while a pointer is down, the ship continuously
