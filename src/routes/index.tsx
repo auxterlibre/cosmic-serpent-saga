@@ -103,8 +103,15 @@ function makeHunters(): Hunter[] {
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
-  for (let i = 0; i < CHECKPOINT_COUNT; i++) {
-    cps.push({ x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) });
+  const minDist = Math.min(WORLD_W, WORLD_H) / (CHECKPOINT_COUNT * 0.6);
+  const minDistSq = minDist * minDist;
+  let attempts = 0;
+  while (cps.length < CHECKPOINT_COUNT && attempts < 2000) {
+    attempts++;
+    const c = { x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) };
+    if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= minDistSq)) {
+      cps.push(c);
+    }
   }
   return cps;
 }
