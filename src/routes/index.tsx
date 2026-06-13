@@ -1360,6 +1360,36 @@ function Game() {
                     );
                   })}
                 </div>
+                <div className="mt-3 mb-2 text-xs uppercase tracking-wide opacity-70">Break down</div>
+                <div className="space-y-2">
+                  {RARITY_ORDER.slice(1).map((from) => {
+                    const idx = RARITY_ORDER.indexOf(from);
+                    const to = RARITY_ORDER[idx - 1];
+                    const have = hud.inventory[from];
+                    const afford = have >= 1;
+                    const fromInfo = RARITY_INFO[from];
+                    const toInfo = RARITY_INFO[to];
+                    return (
+                      <button
+                        key={from}
+                        onClick={() => tryBreakdown(from)}
+                        disabled={!afford}
+                        className="w-full rounded bg-amber-500/10 px-3 py-2 text-left text-sm hover:bg-amber-500/20 disabled:opacity-40"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
+                            <span style={{ color: fromInfo.color }}>1 {from}</span>
+                            <span className="opacity-60">→</span>
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
+                            <span style={{ color: toInfo.color }}>{BREAKDOWN_YIELD} {to}</span>
+                          </span>
+                          <span className="text-[11px] opacity-60">have {have}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
             <button
