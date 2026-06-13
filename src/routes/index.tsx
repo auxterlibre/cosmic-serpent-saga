@@ -54,8 +54,8 @@ function randPos(): Vec {
   return { x: rand(WORLD_W), y: rand(WORLD_H) };
 }
 
-function makeLoot(): Vec[] {
-  return Array.from({ length: LOOT_COUNT }, randPos);
+function makeLoot(): Colored[] {
+  return Array.from({ length: LOOT_COUNT }, () => ({ ...randPos(), color: pickLootColor() }));
 }
 function makeObstacles(): Obstacle[] {
   return Array.from({ length: OBSTACLE_COUNT }, () => {
@@ -74,9 +74,9 @@ function makeCheckpoints(): Checkpoint[] {
   return cps;
 }
 
-function initialSnake(): Vec[] {
-  const arr: Vec[] = [];
-  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50 });
+function initialSnake(): Seg[] {
+  const arr: Seg[] = [];
+  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50, color: SEG_COLOR_DEFAULT });
   return arr;
 }
 
