@@ -675,29 +675,11 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
-                // Drop stolen segments back as loot with original rarity
-                for (const st of h.stolen) {
-                  const jitter = () => (Math.random() - 0.5) * 0.6;
-                  s.loot.push({
-                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())),
-                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())),
-                    color: st.color,
-                    rarity: st.rarity,
-                  });
-                }
-                // Bonus drop: a single piece of loot biased toward higher rarities
-                {
-                  const jitter = () => (Math.random() - 0.5) * 0.6;
-                  const r = pickRarity(0.6);
-                  s.loot.push({
-                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())),
-                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())),
-                    color: RARITY_INFO[r].color,
-                    rarity: r,
-                  });
-                }
+                // Hunters only drop scrap parts. Any segments they stole are lost.
+                s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
                 s.hunters.splice(i, 1);
                 s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                syncHud();
               }
               return false;
             }
