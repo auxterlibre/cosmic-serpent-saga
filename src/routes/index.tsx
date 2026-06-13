@@ -90,6 +90,8 @@ function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
 
 // Player starts as just the head — no trailing segments.
 const INITIAL_LENGTH = 1;
+const INITIAL_CAP = 6;
+const OVER_CAP_MS = 5000;
 const START: Vec = { x: 50, y: 50 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
