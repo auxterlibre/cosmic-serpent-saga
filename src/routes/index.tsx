@@ -69,23 +69,39 @@ function pickRarity(boost = 0): Rarity {
   }
   return "common";
 }
-function makeLootItem(boost = 0): Colored {
+function makeLootItem(boost = 0, awayFrom?: Vec): Colored {
   const r = pickRarity(boost);
-  return { ...randPos(), color: RARITY_INFO[r].color, rarity: r };
+  return { ...randPosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
 }
 
 function rand(n: number) { return Math.floor(Math.random() * n); }
 function randPos(): Vec { return { x: rand(WORLD_W), y: rand(WORLD_H) }; }
 
-function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem()); }
+// Spawn distance threshold — large enough to be off-screen on typical viewports.
+const SPAWN_MIN_DIST = 35;
+function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
+  if (!from) return randPos();
+  for (let i = 0; i < 60; i++) {
+    const p = randPos();
+    const dx = p.x - from.x, dy = p.y - from.y;
+    if (dx * dx + dy * dy >= minDist * minDist) return p;
+  }
+  return randPos();
+}
+
+// Player starts as just the head — no trailing segments.
+const INITIAL_LENGTH = 1;
+const START: Vec = { x: 50, y: 50 };
+
+function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 function makeObstacles(): Obstacle[] {
   return Array.from({ length: OBSTACLE_COUNT }, () => {
     const big = Math.random() < BIG_OBSTACLE_RATIO;
-    return { x: rand(WORLD_W), y: rand(WORLD_H), big };
+    return { ...randPosAway(START), big };
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -96,9 +112,19 @@ function makeCheckpoints(): Checkpoint[] {
 }
 
 function initialSnake(): Seg[] {
-  const arr: Seg[] = [];
-  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50, color: SEG_COLOR_DEFAULT });
-  return arr;
+  return [{ x: START.x, y: START.y, color: SEG_COLOR_DEFAULT }];
+}
+
+function computeInventory(snake: Seg[], growth: string[]): Cost {
+  const inv: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+  const tally = (color: string) => {
+    for (const r of RARITY_ORDER) {
+      if (RARITY_INFO[r].color === color) { inv[r]++; return; }
+    }
+  };
+  for (let i = INITIAL_LENGTH; i < snake.length; i++) tally(snake[i].color);
+  for (const c of growth) tally(c);
+  return inv;
 }
 
 // Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
@@ -123,9 +149,6 @@ function costFor(level: number): Cost {
 function canAfford(inv: Cost, cost: Cost): boolean {
   return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic;
 }
-function payCost(inv: Cost, cost: Cost) {
-  inv.common -= cost.common; inv.uncommon -= cost.uncommon; inv.rare -= cost.rare; inv.epic -= cost.epic;
-}
 
 function initialState() {
   return {
@@ -140,7 +163,6 @@ function initialState() {
     projectiles: [] as Projectile[],
     alive: true,
     score: 0,
-    inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
     scrap: 0,
     // Upgrade levels (number of times bought; affects next cost)
     lvlFireRate: 1,
@@ -170,7 +192,7 @@ function Game() {
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
-    length: 4,
+    length: 1,
     alive: true,
     fireIntervalMs: 2000,
     damage: 1,
@@ -303,8 +325,8 @@ function Game() {
       for (let i = s.growth.length - 1; i >= 0 && need > 0; i--) {
         if (s.growth[i] === color) { s.growth.splice(i, 1); need--; }
       }
-      // Then remove from the tail end of the snake, preserving the first 4 default segments
-      for (let i = s.snake.length - 1; i >= 4 && need > 0; i--) {
+      // Then remove from the tail end of the snake, preserving the head.
+      for (let i = s.snake.length - 1; i >= INITIAL_LENGTH && need > 0; i--) {
         if (s.snake[i].color === color) { s.snake.splice(i, 1); need--; }
       }
     }
@@ -313,13 +335,14 @@ function Game() {
   function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed", apply: () => void) {
     const s = stateRef.current;
     const cost = costFor(s[lvlKey]);
-    if (!canAfford(s.inventory, cost)) return;
-    payCost(s.inventory, cost);
+    const inv = computeInventory(s.snake, s.growth);
+    if (!canAfford(inv, cost)) return;
     spendSegments(cost);
     apply();
     s[lvlKey] += 1;
     syncHud();
   }
+
 
   function buyFireRate() {
     const s = stateRef.current;
@@ -357,7 +380,7 @@ function Game() {
       fireRange: s.fireRange,
       multishot: s.multishot,
       playerSpeed: s.playerSpeed,
-      inventory: { ...s.inventory },
+      inventory: computeInventory(s.snake, s.growth),
       scrap: s.scrap,
       lvlFireRate: s.lvlFireRate,
       lvlDamage: s.lvlDamage,
@@ -430,7 +453,7 @@ function Game() {
         const SELF_HIT = 0.7;
         const SELF_HIT2 = SELF_HIT * SELF_HIT;
         // Skip the first few segments — they naturally trail right behind the head.
-        for (let i = 4; i < s.snake.length; i++) {
+        for (let i = 3; i < s.snake.length; i++) {
           const seg = s.snake[i];
           const dx = seg.x - hx;
           const dy = seg.y - hy;
@@ -461,9 +484,8 @@ function Game() {
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
           s.loot.splice(i, 1);
-          s.loot.push(makeLootItem());
+          s.loot.push(makeLootItem(0, head));
           s.score += RARITY_INFO[l.rarity].value;
-          s.inventory[l.rarity] += 1;
           s.growth.push(l.color);
           hudDirty = true;
         }
@@ -481,7 +503,7 @@ function Game() {
           const shrink = o.big ? 2 : 1;
           s.obstacles.splice(i, 1);
           const big = Math.random() < BIG_OBSTACLE_RATIO;
-          s.obstacles.push({ ...randPos(), big });
+          s.obstacles.push({ ...randPosAway(head), big });
           for (let k = 0; k < shrink; k++) if (s.snake.length > 0) s.snake.pop();
           if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
           hudDirty = true;
@@ -580,7 +602,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
               }
             }
             continue;
@@ -602,7 +624,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
               }
               syncHud();
               continue;
@@ -696,7 +718,7 @@ function Game() {
                 // Hunters only drop scrap parts. Any segments they stole are lost.
                 s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
                 syncHud();
               }
               return false;
