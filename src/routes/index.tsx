@@ -1022,12 +1022,6 @@ function Game() {
           ctx.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, cr, 0, Math.PI * 2);
           ctx.fill();
         }
-        // danger rim accent
-        ctx.strokeStyle = "rgba(220, 60, 60, 0.55)";
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseR + 1.5, 0, Math.PI * 2);
-        ctx.stroke();
       }
 
       // ---- Hunters: alien fighters ----
