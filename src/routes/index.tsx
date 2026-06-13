@@ -803,7 +803,13 @@ function Game() {
         const seg = s.snake[i];
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
-        ctx.fillStyle = i === 0 ? "#7df9ff" : "#3aa8b8";
+      // Snake — segment color preserved from the loot that grew it
+      const R = CELL * 0.45;
+      for (let i = s.snake.length - 1; i >= 0; i--) {
+        const seg = s.snake[i];
+        const px = seg.x * CELL - camX;
+        const py = seg.y * CELL - camY;
+        ctx.fillStyle = i === 0 ? "#7df9ff" : seg.color;
         ctx.beginPath();
         ctx.arc(px, py, R, 0, Math.PI * 2);
         ctx.fill();
