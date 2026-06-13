@@ -821,13 +821,13 @@ function Game() {
       }
 
       for (const o of s.obstacles) {
-        const size = o.big ? 2 : 1;
+        const size = 2;
         const px = o.x * CELL - camX;
         const py = o.y * CELL - camY;
         if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
-        ctx.fillStyle = o.big ? "#5b5b6b" : "#6b6b7d";
+        ctx.fillStyle = "#5b5b6b";
         ctx.fillRect(px + 2, py + 2, size * CELL - 4, size * CELL - 4);
-        ctx.strokeStyle = "#9a9aae";
+        ctx.strokeStyle = "#c44";
         ctx.lineWidth = 1;
         ctx.strokeRect(px + 3, py + 3, size * CELL - 6, size * CELL - 6);
       }
