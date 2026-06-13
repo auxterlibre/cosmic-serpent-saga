@@ -777,26 +777,26 @@ function Game() {
             <div className="mt-4 space-y-2">
               <button
                 onClick={buyFireRate}
-                disabled={hud.length <= 2 || hud.fireIntervalMs <= 300}
+                disabled={hud.length <= hud.costFireRate || hud.fireIntervalMs <= 300}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Fire rate +20% — 2 segments
+                Fire rate +20% — {hud.costFireRate} segments
                 <div className="text-xs opacity-60">Current: {(hud.fireIntervalMs / 1000).toFixed(2)}s</div>
               </button>
               <button
                 onClick={buyDamage}
-                disabled={hud.length <= 3}
+                disabled={hud.length <= hud.costDamage}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Damage +1 — 3 segments
+                Damage +1 — {hud.costDamage} segments
                 <div className="text-xs opacity-60">Current: {hud.damage}</div>
               </button>
               <button
                 onClick={buyRange}
-                disabled={hud.length <= 2 || hud.fireRange >= 30}
+                disabled={hud.length <= hud.costRange || hud.fireRange >= 30}
                 className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
               >
-                Range +2 — 2 segments
+                Range +2 — {hud.costRange} segments
                 <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
               </button>
             </div>
