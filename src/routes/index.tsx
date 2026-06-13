@@ -32,7 +32,7 @@ type Obstacle = { x: number; y: number };
 type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
-type Seg = { x: number; y: number; color: string };
+type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
@@ -90,6 +90,8 @@ function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
 
 // Player starts as just the head — no trailing segments.
 const INITIAL_LENGTH = 1;
+const INITIAL_CAP = 6;
+const OVER_CAP_MS = 5000;
 const START: Vec = { x: 50, y: 50 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
@@ -166,6 +168,8 @@ function initialState() {
     lvlRange: 1,
     lvlMultishot: 1,
     lvlSpeed: 1,
+    lvlCap: 1,
+    segCap: INITIAL_CAP,
     // Derived stats
     fireIntervalMs: 2000,
     damage: 1,
@@ -202,6 +206,8 @@ function Game() {
     lvlRange: 1,
     lvlMultishot: 1,
     lvlSpeed: 1,
+    lvlCap: 1,
+    segCap: INITIAL_CAP,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
@@ -328,7 +334,7 @@ function Game() {
     }
   }
 
-  function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed", apply: () => void) {
+  function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed" | "lvlCap", apply: () => void) {
     const s = stateRef.current;
     const cost = costFor(s[lvlKey]);
     const inv = computeInventory(s.snake, s.growth);
@@ -363,6 +369,10 @@ function Game() {
     const s = stateRef.current;
     if (s.playerSpeed >= BASE_PLAYER_SPEED * 2) return;
     tryBuy("lvlSpeed", () => { s.playerSpeed = Math.min(BASE_PLAYER_SPEED * 2, s.playerSpeed + 0.8); });
+  }
+  function buyCap() {
+    const s = stateRef.current;
+    tryBuy("lvlCap", () => { s.segCap += 2; });
   }
 
   // Crafting: 3 of a lower rarity -> 1 of the next rarity up.
@@ -399,6 +409,8 @@ function Game() {
       lvlRange: s.lvlRange,
       lvlMultishot: s.lvlMultishot,
       lvlSpeed: s.lvlSpeed,
+      lvlCap: s.lvlCap,
+      segCap: s.segCap,
     });
   }
 
@@ -449,10 +461,35 @@ function Game() {
         }
       }
 
+      // Expire over-cap segments whose 5s timer has run out.
+      {
+        const now = performance.now();
+        for (let i = s.snake.length - 1; i >= 1; i--) {
+          const seg = s.snake[i];
+          if (seg.overCapUntil !== undefined && now >= seg.overCapUntil) {
+            s.snake.splice(i, 1);
+          }
+        }
+      }
+
       while (s.growth.length > 0 && s.snake.length > 0) {
         const tail = s.snake[s.snake.length - 1];
         const color = s.growth.shift()!;
-        s.snake.push({ x: tail.x, y: tail.y, color });
+        const bodyCount = s.snake.length - 1; // excludes head
+        if (bodyCount >= s.segCap) {
+          // Over-cap: if another over-cap segment already exists, drop ALL
+          // over-cap segments (the new pickup included) — greed punishes you.
+          const hasOver = s.snake.some((sg) => sg.overCapUntil !== undefined);
+          if (hasOver) {
+            for (let i = s.snake.length - 1; i >= 1; i--) {
+              if (s.snake[i].overCapUntil !== undefined) s.snake.splice(i, 1);
+            }
+            continue;
+          }
+          s.snake.push({ x: tail.x, y: tail.y, color, overCapUntil: performance.now() + OVER_CAP_MS });
+        } else {
+          s.snake.push({ x: tail.x, y: tail.y, color });
+        }
       }
 
       const hx = head.x;
@@ -534,6 +571,8 @@ function Game() {
           s.paused = true;
           s.shopOpen = true;
           s.cpCooldown.add(i);
+          // Reaching a checkpoint locks in any over-cap segments as currency.
+          for (const sg of s.snake) if (sg.overCapUntil !== undefined) sg.overCapUntil = undefined;
           setShop({ open: true, checkpoint: i });
           break;
         }
@@ -897,14 +936,21 @@ function Game() {
       }
 
       const R = CELL * 0.45;
+      const blinkOn = Math.floor(performance.now() / 180) % 2 === 0;
       for (let i = s.snake.length - 1; i >= 0; i--) {
         const seg = s.snake[i];
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
-        ctx.fillStyle = i === 0 ? "#7df9ff" : seg.color;
+        const overCap = seg.overCapUntil !== undefined;
+        ctx.fillStyle = i === 0 ? "#7df9ff" : (overCap && blinkOn ? "#ef4444" : seg.color);
         ctx.beginPath();
         ctx.arc(px, py, R, 0, Math.PI * 2);
         ctx.fill();
+        if (overCap) {
+          ctx.strokeStyle = "#ef4444";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
       }
 
       if (s.snake[0]) {
@@ -1045,6 +1091,10 @@ function Game() {
                 <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />
                 scrap: {hud.scrap}
               </span>
+              <span className="inline-flex items-center gap-1 rounded px-2 py-1"
+                style={{ backgroundColor: "#7df9ff1f", border: "1px solid #7df9ff55", color: "#7df9ff" }}>
+                cap: {hud.length - 1}/{hud.segCap}
+              </span>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1084,6 +1134,12 @@ function Game() {
                     label="Ship speed +"
                     current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
                     maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
+                  />
+                  <UpgradeButton
+                    onClick={buyCap}
+                    level={hud.lvlCap}
+                    label="Segment cap +2"
+                    current={`Holds ${hud.segCap} segments`}
                   />
                 </div>
               </div>
