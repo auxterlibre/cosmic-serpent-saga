@@ -401,6 +401,23 @@ function Game() {
     syncHud();
   }
 
+  // Breakdown: 1 of a higher rarity -> 2 of the rarity below.
+  const BREAKDOWN_YIELD = 2;
+  function tryBreakdown(from: Rarity) {
+    const idx = RARITY_ORDER.indexOf(from);
+    if (idx <= 0) return;
+    const to = RARITY_ORDER[idx - 1];
+    const s = stateRef.current;
+    const inv = computeInventory(s.snake, s.growth);
+    if (inv[from] < 1) return;
+    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    cost[from] = 1;
+    spendSegments(cost);
+    for (let i = 0; i < BREAKDOWN_YIELD; i++) s.growth.push(RARITY_INFO[to].color);
+    syncHud();
+  }
+
+
   function syncHud() {
     const s = stateRef.current;
     setHud({
