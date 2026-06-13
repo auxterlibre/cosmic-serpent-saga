@@ -11,11 +11,13 @@ export const Route = createFileRoute("/")({
   component: Game,
 });
 
-// World/grid config
+// World/render config
 const CELL = 20;
 const WORLD_W = 100;
 const WORLD_H = 100;
-const TICK_MS = 90;
+const PLAYER_SPEED = 6.5; // cells per second
+const TURN_RATE = 7.5; // radians per second (max turn speed)
+const SEG_SPACING = 0.85; // distance between snake body segments (in cells)
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 25;
 const BIG_OBSTACLE_RATIO = 0.3;
@@ -24,22 +26,16 @@ const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
-type Dir = Vec;
 
 type Obstacle = { x: number; y: number; big: boolean };
 type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Vec[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 
-const DIRS: Record<string, Dir> = {
-  ArrowUp: { x: 0, y: -1 },
-  ArrowDown: { x: 0, y: 1 },
-  ArrowLeft: { x: -1, y: 0 },
-  ArrowRight: { x: 1, y: 0 },
-  w: { x: 0, y: -1 },
-  s: { x: 0, y: 1 },
-  a: { x: -1, y: 0 },
-  d: { x: 1, y: 0 },
+const KEY_ANGLE: Record<string, number> = {
+  ArrowUp: -Math.PI / 2, ArrowDown: Math.PI / 2, ArrowLeft: Math.PI, ArrowRight: 0,
+  w: -Math.PI / 2, s: Math.PI / 2, a: Math.PI, d: 0,
+  W: -Math.PI / 2, S: Math.PI / 2, A: Math.PI, D: 0,
 };
 
 function rand(n: number) {
@@ -69,15 +65,18 @@ function makeCheckpoints(): Checkpoint[] {
   return cps;
 }
 
+function initialSnake(): Vec[] {
+  const arr: Vec[] = [];
+  for (let i = 0; i < 4; i++) arr.push({ x: 50 - i * SEG_SPACING, y: 50 });
+  return arr;
+}
+
 function initialState() {
   return {
-    snake: [
-      { x: 50, y: 50 },
-      { x: 49, y: 50 },
-      { x: 48, y: 50 },
-    ] as Vec[],
-    dir: { x: 1, y: 0 } as Dir,
-    nextDir: { x: 1, y: 0 } as Dir,
+    snake: initialSnake(),
+    headAngle: 0,
+    targetAngle: 0,
+    growth: 0,
     loot: makeLoot(),
     obstacles: makeObstacles(),
     hunters: makeHunters(),
@@ -102,7 +101,7 @@ function Game() {
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
-    length: 3,
+    length: 4,
     alive: true,
     fireIntervalMs: 2000,
     damage: 1,
@@ -115,24 +114,18 @@ function Game() {
   // Input
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.repeat) return;
       if (e.key === "r" || e.key === "R") { reset(); return; }
       if (e.key === "Escape") { closeShop(); return; }
-      if (e.key === "p" || e.key === "P") {
-        togglePause();
-        return;
-      }
-      const d = DIRS[e.key];
-      if (!d) return;
-      const cur = stateRef.current.dir;
-      if (d.x === -cur.x && d.y === -cur.y) return;
-      stateRef.current.nextDir = d;
+      if (e.key === "p" || e.key === "P") { togglePause(); return; }
+      const a = KEY_ANGLE[e.key];
+      if (a === undefined) return;
+      stateRef.current.targetAngle = a;
     };
     window.addEventListener("keydown", onKey);
     return () => { window.removeEventListener("keydown", onKey); };
   }, []);
 
-  // Swipe input
+  // Swipe input (continuous steering)
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
@@ -145,13 +138,9 @@ function Game() {
       if (!active) return;
       const dx = e.clientX - sx;
       const dy = e.clientY - sy;
-      const THRESH = 24;
+      const THRESH = 14;
       if (Math.abs(dx) < THRESH && Math.abs(dy) < THRESH) return;
-      let d: Dir;
-      if (Math.abs(dx) > Math.abs(dy)) d = { x: Math.sign(dx), y: 0 };
-      else d = { x: 0, y: Math.sign(dy) };
-      const cur = stateRef.current.dir;
-      if (!(d.x === -cur.x && d.y === -cur.y)) stateRef.current.nextDir = d;
+      stateRef.current.targetAngle = Math.atan2(dy, dx);
       sx = e.clientX; sy = e.clientY;
     };
     const onUp = () => { active = false; };
@@ -183,7 +172,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 3, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
+    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8 });
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
@@ -254,57 +243,105 @@ function Game() {
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
-    let acc = 0;
 
-    const tick = () => {
+    const updatePlayer = (dt: number) => {
       const s = stateRef.current;
       if (!s.alive || s.paused) return;
-      s.dir = s.nextDir;
+      const dtSec = dt / 1000;
+
+      // Smooth angle steering toward target
+      let diff = s.targetAngle - s.headAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      const maxTurn = TURN_RATE * dtSec;
+      if (Math.abs(diff) <= maxTurn) s.headAngle = s.targetAngle;
+      else s.headAngle += Math.sign(diff) * maxTurn;
+
+      // Move head forward
       const head = s.snake[0];
-      const nx = head.x + s.dir.x;
-      const ny = head.y + s.dir.y;
+      const step = PLAYER_SPEED * dtSec;
+      head.x += Math.cos(s.headAngle) * step;
+      head.y += Math.sin(s.headAngle) * step;
 
-      if (nx < 0 || ny < 0 || nx >= WORLD_W || ny >= WORLD_H) { s.alive = false; syncHud(); return; }
-      if (s.snake.some((seg) => seg.x === nx && seg.y === ny)) { s.alive = false; syncHud(); return; }
-
-      const newHead = { x: nx, y: ny };
-      s.snake.unshift(newHead);
-
-      const lootIdx = s.loot.findIndex((l) => l.x === nx && l.y === ny);
-      let grew = false;
-      if (lootIdx >= 0) {
-        s.loot.splice(lootIdx, 1);
-        s.loot.push(randPos());
-        s.score += 10;
-        grew = true;
+      // Wall = death
+      if (head.x < 0 || head.y < 0 || head.x >= WORLD_W || head.y >= WORLD_H) {
+        s.alive = false; syncHud(); return;
       }
 
-      const obIdx = s.obstacles.findIndex(
-        (o) => nx >= o.x && nx <= o.x + (o.big ? 1 : 0) && ny >= o.y && ny <= o.y + (o.big ? 1 : 0),
-      );
-      let shrink = 0;
-      if (obIdx >= 0) {
-        const o = s.obstacles[obIdx];
-        shrink += o.big ? 2 : 1;
-        s.obstacles.splice(obIdx, 1);
-        const big = Math.random() < BIG_OBSTACLE_RATIO;
-        s.obstacles.push({ ...randPos(), big });
+      // Chain follow: each segment pulled to maintain SEG_SPACING from previous
+      for (let i = 1; i < s.snake.length; i++) {
+        const prev = s.snake[i - 1];
+        const cur = s.snake[i];
+        const dx = prev.x - cur.x;
+        const dy = prev.y - cur.y;
+        const d = Math.hypot(dx, dy);
+        if (d > SEG_SPACING && d > 0) {
+          const k = (d - SEG_SPACING) / d;
+          cur.x += dx * k;
+          cur.y += dy * k;
+        }
       }
 
-      const cpIdx = s.checkpoints.findIndex((c) => c.x === nx && c.y === ny);
-      if (cpIdx >= 0) {
-        s.paused = true;
-        s.shopOpen = true;
-        setShop({ open: true, checkpoint: cpIdx });
+      // Grow: append at tail when growth is pending
+      if (s.growth > 0 && s.snake.length > 0) {
+        const tail = s.snake[s.snake.length - 1];
+        s.snake.push({ x: tail.x, y: tail.y });
+        s.growth -= 1;
       }
 
-      if (!grew) s.snake.pop();
-      for (let i = 0; i < shrink; i++) {
-        if (s.snake.length > 0) s.snake.pop();
-      }
-      if (s.snake.length === 0) s.alive = false;
+      const hx = head.x;
+      const hy = head.y;
+      const PICK = 0.7;
 
-      syncHud();
+      // Loot collisions
+      let hudDirty = false;
+      for (let i = s.loot.length - 1; i >= 0; i--) {
+        const l = s.loot[i];
+        const dx = (l.x + 0.5) - hx;
+        const dy = (l.y + 0.5) - hy;
+        if (dx * dx + dy * dy <= PICK * PICK) {
+          s.loot.splice(i, 1);
+          s.loot.push(randPos());
+          s.score += 10;
+          s.growth += 1;
+          hudDirty = true;
+        }
+      }
+
+      // Obstacle collisions (shrinks)
+      for (let i = s.obstacles.length - 1; i >= 0; i--) {
+        const o = s.obstacles[i];
+        const size = o.big ? 2 : 1;
+        const cx = o.x + size / 2;
+        const cy = o.y + size / 2;
+        const dx = cx - hx;
+        const dy = cy - hy;
+        const r = size / 2 + 0.3;
+        if (dx * dx + dy * dy <= r * r) {
+          const shrink = o.big ? 2 : 1;
+          s.obstacles.splice(i, 1);
+          const big = Math.random() < BIG_OBSTACLE_RATIO;
+          s.obstacles.push({ ...randPos(), big });
+          for (let k = 0; k < shrink; k++) if (s.snake.length > 0) s.snake.pop();
+          if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
+          hudDirty = true;
+        }
+      }
+
+      // Checkpoints
+      for (let i = 0; i < s.checkpoints.length; i++) {
+        const cp = s.checkpoints[i];
+        const dx = (cp.x + 0.5) - hx;
+        const dy = (cp.y + 0.5) - hy;
+        if (dx * dx + dy * dy <= PICK * PICK) {
+          s.paused = true;
+          s.shopOpen = true;
+          setShop({ open: true, checkpoint: i });
+          break;
+        }
+      }
+
+      if (hudDirty) syncHud();
     };
 
     const updateRealtime = (dt: number) => {
@@ -319,7 +356,6 @@ function Game() {
 
           let tx: number, ty: number;
           if (h.fleeing) {
-            // Run toward the chosen escape point on the world edge
             if (!h.fleeTarget) {
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
               const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
@@ -328,17 +364,14 @@ function Game() {
             tx = h.fleeTarget.x + 0.5;
             ty = h.fleeTarget.y + 0.5;
           } else {
-            // Target nearest snake segment
             let bestD = Infinity;
             let bx = 0, by = 0;
             for (let i = 0; i < s.snake.length; i++) {
               const seg = s.snake[i];
-              const sx = seg.x + 0.5;
-              const sy = seg.y + 0.5;
-              const ddx = sx - (h.x + 0.5);
-              const ddy = sy - (h.y + 0.5);
+              const ddx = seg.x - (h.x + 0.5);
+              const ddy = seg.y - (h.y + 0.5);
               const d = ddx * ddx + ddy * ddy;
-              if (d < bestD) { bestD = d; bx = sx; by = sy; }
+              if (d < bestD) { bestD = d; bx = seg.x; by = seg.y; }
             }
             if (bestD === Infinity) continue;
             tx = bx; ty = by;
@@ -360,16 +393,14 @@ function Game() {
             while (diff < -Math.PI) diff += Math.PI * 2;
             h.angle += diff * Math.min(1, dtSec * 8);
 
-            // Append trail points spaced by ~1 cell
-            const last = h.trail[0];
-            if (!last || Math.hypot(h.x - last.x, h.y - last.y) >= 1) {
+            const last0 = h.trail[0];
+            if (!last0 || Math.hypot(h.x - last0.x, h.y - last0.y) >= 1) {
               h.trail.unshift({ x: h.x, y: h.y });
             }
             const maxTrail = Math.max(0, h.hp - 1);
             if (h.trail.length > maxTrail) h.trail.length = maxTrail;
           }
 
-          // If fleeing and reached the edge, vanish with the loot and respawn fresh
           if (h.fleeing) {
             if (h.x < -1 || h.y < -1 || h.x > WORLD_W + 1 || h.y > WORLD_H + 1) {
               const idx = s.hunters.indexOf(h);
@@ -381,25 +412,19 @@ function Game() {
             continue;
           }
 
-          // Collision with snake
           if (h.cooldown <= 0) {
             const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
             const reach = (hsize + 0.4) * (hsize + 0.4);
             let hitIdx = -1;
             for (let i = 0; i < s.snake.length; i++) {
               const seg = s.snake[i];
-              const ddx = (seg.x + 0.5) - (h.x + 0.5);
-              const ddy = (seg.y + 0.5) - (h.y + 0.5);
+              const ddx = seg.x - (h.x + 0.5);
+              const ddy = seg.y - (h.y + 0.5);
               if (ddx * ddx + ddy * ddy <= reach) { hitIdx = i; break; }
             }
             if (hitIdx === 0) {
-              // Touched the head: player loses tail, hunter destroyed
               s.snake.pop();
-              if (s.snake.length === 0) {
-                s.alive = false;
-                syncHud();
-                return;
-              }
+              if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
@@ -408,7 +433,6 @@ function Game() {
               syncHud();
               continue;
             } else if (hitIdx > 0) {
-              // Steal a body segment and flee with the loot
               s.snake.splice(hitIdx, 1);
               h.hp += 1;
               h.cooldown = 400;
@@ -431,8 +455,8 @@ function Game() {
           type T = { x: number; y: number; d2: number };
           let best: T | null = null;
           const consider = (cx: number, cy: number, vx = 0, vy = 0) => {
-            const dx = cx - (head.x + 0.5);
-            const dy = cy - (head.y + 0.5);
+            const dx = cx - head.x;
+            const dy = cy - head.y;
             const d2 = dx * dx + dy * dy;
             if (d2 > rangeSq) return;
             const t = Math.sqrt(d2) / PROJ_SPEED;
@@ -448,13 +472,13 @@ function Game() {
           if (best) {
             s.fireTimer = 0;
             const b: T = best;
-            const dx = b.x - (head.x + 0.5);
-            const dy = b.y - (head.y + 0.5);
+            const dx = b.x - head.x;
+            const dy = b.y - head.y;
             const len = Math.hypot(dx, dy) || 1;
             const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
             s.projectiles.push({
-              x: head.x + 0.5,
-              y: head.y + 0.5,
+              x: head.x,
+              y: head.y,
               vx: (dx / len) * PROJ_SPEED,
               vy: (dy / len) * PROJ_SPEED,
               life: lifeMs,
@@ -496,13 +520,10 @@ function Game() {
     };
 
     const loop = (now: number) => {
-      const dt = now - last;
+      let dt = now - last;
       last = now;
-      acc += dt;
-      while (acc >= TICK_MS) {
-        tick();
-        acc -= TICK_MS;
-      }
+      if (dt > 100) dt = 100; // clamp big stalls
+      updatePlayer(dt);
       updateRealtime(dt);
       draw();
       raf = requestAnimationFrame(loop);
@@ -524,8 +545,8 @@ function Game() {
       const wViewW = viewW / zoom;
       const wViewH = viewH / zoom;
 
-      let camX = head.x * CELL + CELL / 2 - wViewW / 2;
-      let camY = head.y * CELL + CELL / 2 - wViewH / 2;
+      let camX = head.x * CELL - wViewW / 2;
+      let camY = head.y * CELL - wViewH / 2;
       camX = Math.max(0, Math.min(WORLD_W * CELL - wViewW, camX));
       camY = Math.max(0, Math.min(WORLD_H * CELL - wViewH, camY));
 
@@ -587,7 +608,6 @@ function Game() {
         const cy = h.y * CELL + CELL / 2 - camY;
         if (cx < -CELL * 4 || cy < -CELL * 4 || cx > wViewW + CELL * 4 || cy > wViewH + CELL * 4) continue;
 
-        // Trail segments (body)
         for (const t of h.trail) {
           const tx = t.x * CELL + CELL / 2 - camX;
           const ty = t.y * CELL + CELL / 2 - camY;
@@ -595,7 +615,6 @@ function Game() {
           ctx.fillRect(tx - CELL / 2 + 1, ty - CELL / 2 + 1, CELL - 2, CELL - 2);
         }
 
-        // Head triangle
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
@@ -616,16 +635,29 @@ function Game() {
         ctx.fillRect(px - 2, py - 2, 4, 4);
       }
 
-      s.snake.forEach((seg, i) => {
+      // Snake — smooth rounded body
+      const R = CELL * 0.45;
+      for (let i = s.snake.length - 1; i >= 0; i--) {
+        const seg = s.snake[i];
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
         ctx.fillStyle = i === 0 ? "#7df9ff" : "#3aa8b8";
-        ctx.fillRect(px + 1, py + 1, CELL - 2, CELL - 2);
-      });
+        ctx.beginPath();
+        ctx.arc(px, py, R, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       if (s.snake[0]) {
-        const hx = s.snake[0].x * CELL + CELL / 2 - camX;
-        const hy = s.snake[0].y * CELL + CELL / 2 - camY;
+        const hx = s.snake[0].x * CELL - camX;
+        const hy = s.snake[0].y * CELL - camY;
+        // Direction indicator (small notch)
+        ctx.save();
+        ctx.translate(hx, hy);
+        ctx.rotate(s.headAngle);
+        ctx.fillStyle = "#e0ffff";
+        ctx.fillRect(R - 4, -2, 6, 4);
+        ctx.restore();
+
         ctx.strokeStyle = "rgba(125, 249, 255, 0.18)";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
@@ -668,7 +700,7 @@ function Game() {
 
             <div className="mt-5 text-sm font-semibold text-cyan-300">HOW TO PLAY</div>
             <ul className="mt-2 space-y-2 text-sm">
-              <li>👆 <span className="opacity-80">Swipe</span> to steer (up / down / left / right)</li>
+              <li>👆 <span className="opacity-80">Swipe</span> in any direction to steer smoothly</li>
               <li>⌨️ <span className="opacity-80">Arrows or WASD</span> on keyboard</li>
               <li>💛 Collect loot to grow longer</li>
               <li>🟧 Hunters chase you — you auto-fire at them</li>
