@@ -484,9 +484,8 @@ function Game() {
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
           s.loot.splice(i, 1);
-          s.loot.push(makeLootItem());
+          s.loot.push(makeLootItem(0, head));
           s.score += RARITY_INFO[l.rarity].value;
-          s.inventory[l.rarity] += 1;
           s.growth.push(l.color);
           hudDirty = true;
         }
