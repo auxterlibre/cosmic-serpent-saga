@@ -1277,9 +1277,9 @@ function Game() {
               </span>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
               <div>
-                <div className="mb-2 text-xs uppercase tracking-wide opacity-70">Upgrades</div>
+                <div className="mb-2 text-[11px] uppercase tracking-wide opacity-70 sm:text-xs">Upgrades</div>
                 <div className="space-y-2">
                   <UpgradeButton
                     onClick={buyFireRate}
