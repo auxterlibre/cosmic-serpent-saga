@@ -1135,6 +1135,12 @@ function Game() {
                     current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
                     maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
                   />
+                  <UpgradeButton
+                    onClick={buyCap}
+                    level={hud.lvlCap}
+                    label="Segment cap +2"
+                    current={`Holds ${hud.segCap} segments`}
+                  />
                 </div>
               </div>
 
