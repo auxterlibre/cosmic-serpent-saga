@@ -340,6 +340,7 @@ function Game() {
       multishot: s.multishot,
       playerSpeed: s.playerSpeed,
       inventory: { ...s.inventory },
+      scrap: s.scrap,
       lvlFireRate: s.lvlFireRate,
       lvlDamage: s.lvlDamage,
       lvlRange: s.lvlRange,
