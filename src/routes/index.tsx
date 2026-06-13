@@ -380,7 +380,7 @@ function Game() {
       fireRange: s.fireRange,
       multishot: s.multishot,
       playerSpeed: s.playerSpeed,
-      inventory: { ...s.inventory },
+      inventory: computeInventory(s.snake, s.growth),
       scrap: s.scrap,
       lvlFireRate: s.lvlFireRate,
       lvlDamage: s.lvlDamage,
