@@ -503,7 +503,7 @@ function Game() {
           const shrink = o.big ? 2 : 1;
           s.obstacles.splice(i, 1);
           const big = Math.random() < BIG_OBSTACLE_RATIO;
-          s.obstacles.push({ ...randPos(), big });
+          s.obstacles.push({ ...randPosAway(head), big });
           for (let k = 0; k < shrink; k++) if (s.snake.length > 0) s.snake.pop();
           if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
           hudDirty = true;
