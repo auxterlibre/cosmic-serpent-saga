@@ -936,14 +936,21 @@ function Game() {
       }
 
       const R = CELL * 0.45;
+      const blinkOn = Math.floor(performance.now() / 180) % 2 === 0;
       for (let i = s.snake.length - 1; i >= 0; i--) {
         const seg = s.snake[i];
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
-        ctx.fillStyle = i === 0 ? "#7df9ff" : seg.color;
+        const overCap = seg.overCapUntil !== undefined;
+        ctx.fillStyle = i === 0 ? "#7df9ff" : (overCap && blinkOn ? "#ef4444" : seg.color);
         ctx.beginPath();
         ctx.arc(px, py, R, 0, Math.PI * 2);
         ctx.fill();
+        if (overCap) {
+          ctx.strokeStyle = "#ef4444";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+        }
       }
 
       if (s.snake[0]) {
