@@ -277,6 +277,22 @@ function Game() {
     s.costRange += 1;
     syncHud();
   }
+  function buyMultishot() {
+    const s = stateRef.current;
+    if (s.scrap < s.costMultishot) return;
+    s.scrap -= s.costMultishot;
+    s.multishot += 1;
+    s.costMultishot += 4;
+    syncHud();
+  }
+  function buyRepair() {
+    const s = stateRef.current;
+    if (s.scrap < s.costRepair) return;
+    s.scrap -= s.costRepair;
+    const tail = s.snake[s.snake.length - 1];
+    s.snake.push({ x: tail.x, y: tail.y, color: SEG_COLOR_DEFAULT });
+    syncHud();
+  }
   function syncHud() {
     const s = stateRef.current;
     setHud({
@@ -289,6 +305,10 @@ function Game() {
       costFireRate: s.costFireRate,
       costDamage: s.costDamage,
       costRange: s.costRange,
+      scrap: s.scrap,
+      multishot: s.multishot,
+      costMultishot: s.costMultishot,
+      costRepair: s.costRepair,
     });
   }
 
