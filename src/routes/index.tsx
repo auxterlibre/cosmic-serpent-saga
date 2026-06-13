@@ -461,10 +461,35 @@ function Game() {
         }
       }
 
+      // Expire over-cap segments whose 5s timer has run out.
+      {
+        const now = performance.now();
+        for (let i = s.snake.length - 1; i >= 1; i--) {
+          const seg = s.snake[i];
+          if (seg.overCapUntil !== undefined && now >= seg.overCapUntil) {
+            s.snake.splice(i, 1);
+          }
+        }
+      }
+
       while (s.growth.length > 0 && s.snake.length > 0) {
         const tail = s.snake[s.snake.length - 1];
         const color = s.growth.shift()!;
-        s.snake.push({ x: tail.x, y: tail.y, color });
+        const bodyCount = s.snake.length - 1; // excludes head
+        if (bodyCount >= s.segCap) {
+          // Over-cap: if another over-cap segment already exists, drop ALL
+          // over-cap segments (the new pickup included) — greed punishes you.
+          const hasOver = s.snake.some((sg) => sg.overCapUntil !== undefined);
+          if (hasOver) {
+            for (let i = s.snake.length - 1; i >= 1; i--) {
+              if (s.snake[i].overCapUntil !== undefined) s.snake.splice(i, 1);
+            }
+            continue;
+          }
+          s.snake.push({ x: tail.x, y: tail.y, color, overCapUntil: performance.now() + OVER_CAP_MS });
+        } else {
+          s.snake.push({ x: tail.x, y: tail.y, color });
+        }
       }
 
       const hx = head.x;
