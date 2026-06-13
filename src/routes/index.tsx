@@ -306,7 +306,7 @@ function Game() {
 
       const hx = head.x;
       const hy = head.y;
-      const PICK = 0.7;
+      const PICK = 1.2;
 
       // Loot collisions
       let hudDirty = false;
