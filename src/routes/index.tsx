@@ -559,12 +559,14 @@ function Game() {
               syncHud();
               continue;
             } else if (hitIdx > 0) {
-              const stolenSeg = s.snake.splice(hitIdx, 1)[0];
-              h.hp += 1;
-              // Find matching rarity from color (default common)
-              let rar: Rarity = "common";
-              for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === stolenSeg.color) { rar = r; break; }
-              h.stolen.unshift({ color: stolenSeg.color, rarity: rar });
+              // Grab the bitten segment AND every segment after it; they become the hunter's tail.
+              const taken = s.snake.splice(hitIdx);
+              for (const seg of taken) {
+                let rar: Rarity = "common";
+                for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === seg.color) { rar = r; break; }
+                // Push in body order so closest-to-head ends up first in stolen (head of hunter's tail).
+                h.stolen.push({ color: seg.color, rarity: rar });
+              }
               h.cooldown = 400;
               h.fleeing = true;
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
