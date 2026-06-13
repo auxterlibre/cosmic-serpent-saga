@@ -1028,9 +1028,9 @@ function Game() {
 
       {shop.open && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-sm rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
+          <div className="w-full max-w-3xl rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade. Higher-tier upgrades demand rarer loot.</div>
+            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade, or craft lesser loot into rarer pieces.</div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {RARITY_ORDER.map((r) => (
@@ -1047,41 +1047,78 @@ function Game() {
               </span>
             </div>
 
-            <div className="mt-4 space-y-2">
-              <UpgradeButton
-                onClick={buyFireRate}
-                level={hud.lvlFireRate}
-                label="Fire rate +20%"
-                current={`${(hud.fireIntervalMs / 1000).toFixed(2)}s between volleys`}
-                maxed={hud.fireIntervalMs <= 300}
-              />
-              <UpgradeButton
-                onClick={buyDamage}
-                level={hud.lvlDamage}
-                label="Damage +1"
-                current={`Current: ${hud.damage}`}
-              />
-              <UpgradeButton
-                onClick={buyRange}
-                level={hud.lvlRange}
-                label="Range +2"
-                current={`Current: ${hud.fireRange} cells`}
-                maxed={hud.fireRange >= 30}
-              />
-              <UpgradeButton
-                onClick={buyMultishot}
-                level={hud.lvlMultishot}
-                label="Multi-target +1"
-                current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
-                maxed={hud.multishot >= 6}
-              />
-              <UpgradeButton
-                onClick={buySpeed}
-                level={hud.lvlSpeed}
-                label="Ship speed +"
-                current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
-                maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
-              />
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <div className="mb-2 text-xs uppercase tracking-wide opacity-70">Upgrades</div>
+                <div className="space-y-2">
+                  <UpgradeButton
+                    onClick={buyFireRate}
+                    level={hud.lvlFireRate}
+                    label="Fire rate +20%"
+                    current={`${(hud.fireIntervalMs / 1000).toFixed(2)}s between volleys`}
+                    maxed={hud.fireIntervalMs <= 300}
+                  />
+                  <UpgradeButton
+                    onClick={buyDamage}
+                    level={hud.lvlDamage}
+                    label="Damage +1"
+                    current={`Current: ${hud.damage}`}
+                  />
+                  <UpgradeButton
+                    onClick={buyRange}
+                    level={hud.lvlRange}
+                    label="Range +2"
+                    current={`Current: ${hud.fireRange} cells`}
+                    maxed={hud.fireRange >= 30}
+                  />
+                  <UpgradeButton
+                    onClick={buyMultishot}
+                    level={hud.lvlMultishot}
+                    label="Multi-target +1"
+                    current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
+                    maxed={hud.multishot >= 6}
+                  />
+                  <UpgradeButton
+                    onClick={buySpeed}
+                    level={hud.lvlSpeed}
+                    label="Ship speed +"
+                    current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
+                    maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-2 text-xs uppercase tracking-wide opacity-70">Craft</div>
+                <div className="space-y-2">
+                  {RARITY_ORDER.slice(0, -1).map((from, i) => {
+                    const to = RARITY_ORDER[i + 1];
+                    const have = hud.inventory[from];
+                    const afford = have >= CRAFT_COST;
+                    const fromInfo = RARITY_INFO[from];
+                    const toInfo = RARITY_INFO[to];
+                    return (
+                      <button
+                        key={from}
+                        onClick={() => tryCraft(from)}
+                        disabled={!afford}
+                        className="w-full rounded bg-fuchsia-500/10 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/20 disabled:opacity-40"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
+                            <span style={{ color: fromInfo.color }}>{CRAFT_COST} {from}</span>
+                            <span className="opacity-60">→</span>
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
+                            <span style={{ color: toInfo.color }}>1 {to}</span>
+                          </span>
+                          <span className="text-[11px] opacity-60">have {have}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
             <button
               onClick={closeShop}
