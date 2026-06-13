@@ -168,6 +168,8 @@ function initialState() {
     lvlRange: 1,
     lvlMultishot: 1,
     lvlSpeed: 1,
+    lvlCap: 1,
+    segCap: INITIAL_CAP,
     // Derived stats
     fireIntervalMs: 2000,
     damage: 1,
