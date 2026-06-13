@@ -1091,6 +1091,10 @@ function Game() {
                 <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />
                 scrap: {hud.scrap}
               </span>
+              <span className="inline-flex items-center gap-1 rounded px-2 py-1"
+                style={{ backgroundColor: "#7df9ff1f", border: "1px solid #7df9ff55", color: "#7df9ff" }}>
+                cap: {hud.length - 1}/{hud.segCap}
+              </span>
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
