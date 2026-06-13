@@ -571,6 +571,8 @@ function Game() {
           s.paused = true;
           s.shopOpen = true;
           s.cpCooldown.add(i);
+          // Reaching a checkpoint locks in any over-cap segments as currency.
+          for (const sg of s.snake) if (sg.overCapUntil !== undefined) sg.overCapUntil = undefined;
           setShop({ open: true, checkpoint: i });
           break;
         }
