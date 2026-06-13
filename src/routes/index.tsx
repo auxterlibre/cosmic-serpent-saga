@@ -149,9 +149,6 @@ function costFor(level: number): Cost {
 function canAfford(inv: Cost, cost: Cost): boolean {
   return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic;
 }
-function payCost(inv: Cost, cost: Cost) {
-  inv.common -= cost.common; inv.uncommon -= cost.uncommon; inv.rare -= cost.rare; inv.epic -= cost.epic;
-}
 
 function initialState() {
   return {
