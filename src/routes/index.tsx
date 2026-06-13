@@ -91,6 +91,7 @@ function initialState() {
     hunterTimer: 0,
     paused: true,
     shopOpen: false,
+    cpCooldown: new Set<number>(),
     manualPause: true,
   };
 }
