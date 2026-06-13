@@ -1253,10 +1253,10 @@ function Game() {
       )}
 
       {shop.open && hud.alive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
-          <div className="w-full max-w-3xl rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
-            <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade, or craft lesser loot into rarer pieces.</div>
+        <div className="absolute inset-0 flex items-stretch justify-center overflow-y-auto bg-black/60 p-2 sm:items-center sm:p-4">
+          <div className="my-auto max-h-full w-full max-w-3xl overflow-y-auto rounded-lg border border-fuchsia-500/40 bg-[#100820] px-3 py-3 font-mono text-fuchsia-100 sm:px-6 sm:py-5">
+            <div className="text-base sm:text-xl">CHECKPOINT</div>
+            <div className="mt-1 text-[11px] opacity-70 sm:text-xs">Spend loot to upgrade, or craft lesser loot into rarer pieces.</div>
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {RARITY_ORDER.map((r) => (
