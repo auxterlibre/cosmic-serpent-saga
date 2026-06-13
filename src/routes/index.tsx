@@ -500,10 +500,16 @@ function Game() {
 
             const last0 = h.trail[0];
             if (!last0 || Math.hypot(h.x - last0.x, h.y - last0.y) >= 1) {
-              h.trail.unshift({ x: h.x, y: h.y });
+              const cIdx = h.trail.length;
+              const color = h.stolenColors[cIdx] ?? SEG_COLOR_DEFAULT;
+              h.trail.unshift({ x: h.x, y: h.y, color });
             }
-            const maxTrail = Math.max(0, h.hp - 1);
+            const maxTrail = Math.max(0, h.stolenColors.length);
             if (h.trail.length > maxTrail) h.trail.length = maxTrail;
+            // Refresh trail colors so they match stolenColors order
+            for (let ti = 0; ti < h.trail.length; ti++) {
+              h.trail[ti].color = h.stolenColors[ti] ?? SEG_COLOR_DEFAULT;
+            }
           }
 
           if (h.fleeing) {
@@ -538,8 +544,9 @@ function Game() {
               syncHud();
               continue;
             } else if (hitIdx > 0) {
-              s.snake.splice(hitIdx, 1);
+              const stolen = s.snake.splice(hitIdx, 1)[0];
               h.hp += 1;
+              h.stolenColors.unshift(stolen.color);
               h.cooldown = 400;
               h.fleeing = true;
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
