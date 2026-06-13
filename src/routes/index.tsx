@@ -64,7 +64,7 @@ function makeObstacles(): Obstacle[] {
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -511,7 +511,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
             }
             continue;
@@ -533,7 +533,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
               syncHud();
               continue;
@@ -613,7 +613,7 @@ function Game() {
               if (h.hp <= 0) {
                 s.score += 15;
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
               }
               return false;
             }
