@@ -125,27 +125,42 @@ function Game() {
     return () => { window.removeEventListener("keydown", onKey); };
   }, []);
 
-  // Swipe input (continuous steering)
+  // Touch/drag steering: while a pointer is down, the ship continuously
+  // aims toward the pointer position (relative to the ship on screen).
+  // This gives a smooth 360° "spaceship" feel instead of cardinal swipes.
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
-    let sx = 0, sy = 0, active = false;
+    let active = false;
+    let lastX = 0, lastY = 0;
+
+    const aimAt = (clientX: number, clientY: number) => {
+      const rect = c.getBoundingClientRect();
+      // Ship is drawn at the center of the viewport (camera follows head).
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const dx = clientX - cx;
+      const dy = clientY - cy;
+      if (dx * dx + dy * dy < 16) return; // tiny dead-zone at center
+      stateRef.current.targetAngle = Math.atan2(dy, dx);
+    };
+
     const onDown = (e: PointerEvent) => {
-      active = true; sx = e.clientX; sy = e.clientY;
+      active = true;
+      lastX = e.clientX; lastY = e.clientY;
       try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch {}
+      aimAt(e.clientX, e.clientY);
+      e.preventDefault();
     };
     const onMove = (e: PointerEvent) => {
       if (!active) return;
-      const dx = e.clientX - sx;
-      const dy = e.clientY - sy;
-      const THRESH = 14;
-      if (Math.abs(dx) < THRESH && Math.abs(dy) < THRESH) return;
-      stateRef.current.targetAngle = Math.atan2(dy, dx);
-      sx = e.clientX; sy = e.clientY;
+      lastX = e.clientX; lastY = e.clientY;
+      aimAt(e.clientX, e.clientY);
     };
     const onUp = () => { active = false; };
+
     c.addEventListener("pointerdown", onDown);
-    c.addEventListener("pointermove", onMove);
+    c.addEventListener("pointermove", onMove, { passive: false });
     c.addEventListener("pointerup", onUp);
     c.addEventListener("pointercancel", onUp);
     return () => {
