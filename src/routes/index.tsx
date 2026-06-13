@@ -708,8 +708,19 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
-                // Hunters only drop scrap parts. Any segments they stole are lost.
+                // Hunters drop scrap parts on death.
                 s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
+                // If they were carrying stolen segments, scatter them as loot.
+                for (const st of h.stolen) {
+                  const jx = (Math.random() - 0.5) * 2;
+                  const jy = (Math.random() - 0.5) * 2;
+                  s.loot.push({
+                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jx)),
+                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jy)),
+                    color: st.color,
+                    rarity: st.rarity,
+                  });
+                }
                 s.hunters.splice(i, 1);
                 s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
                 syncHud();
