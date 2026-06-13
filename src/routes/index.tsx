@@ -897,8 +897,11 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-sm rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend segments to upgrade. Segments = health — don't drop to 0!</div>
-            <div className="mt-4 text-sm">Segments: <span className="text-cyan-300">{hud.length}</span></div>
+            <div className="mt-1 text-xs opacity-70">Spend segments or scrap to upgrade. Segments = health — don't drop to 0!</div>
+            <div className="mt-4 flex justify-between text-sm">
+              <div>Segments: <span className="text-cyan-300">{hud.length}</span></div>
+              <div>Scrap: <span className="text-slate-200">⚙ {hud.scrap}</span></div>
+            </div>
             <div className="mt-4 space-y-2">
               <button
                 onClick={buyFireRate}
@@ -923,6 +926,23 @@ function Game() {
               >
                 Range +2 — {hud.costRange} segments
                 <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
+              </button>
+              <div className="pt-2 text-xs uppercase tracking-wider opacity-60">Build with scrap ⚙</div>
+              <button
+                onClick={buyMultishot}
+                disabled={hud.scrap < hud.costMultishot}
+                className="w-full rounded bg-slate-400/20 px-3 py-2 text-left text-sm hover:bg-slate-400/30 disabled:opacity-40"
+              >
+                Multi-shot +1 — {hud.costMultishot} ⚙
+                <div className="text-xs opacity-60">Current: {hud.multishot} projectile{hud.multishot > 1 ? "s" : ""} per shot</div>
+              </button>
+              <button
+                onClick={buyRepair}
+                disabled={hud.scrap < hud.costRepair}
+                className="w-full rounded bg-slate-400/20 px-3 py-2 text-left text-sm hover:bg-slate-400/30 disabled:opacity-40"
+              >
+                Hull repair +1 segment — {hud.costRepair} ⚙
+                <div className="text-xs opacity-60">Restores a body segment</div>
               </button>
             </div>
             <button
