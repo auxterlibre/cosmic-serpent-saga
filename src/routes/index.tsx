@@ -727,12 +727,25 @@ function Game() {
         ctx.fillText("$", px + 7, py + 14);
       }
 
-      ctx.fillStyle = "#f5d142";
       for (const l of s.loot) {
         const px = l.x * CELL - camX;
         const py = l.y * CELL - camY;
         if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        ctx.fillStyle = l.color;
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
+      }
+
+      // Scrap parts — small metallic shards
+      for (const sc of s.scraps) {
+        const px = sc.x * CELL - camX;
+        const py = sc.y * CELL - camY;
+        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        const alpha = Math.min(1, sc.life / 2000);
+        ctx.fillStyle = `rgba(180, 200, 220, ${alpha})`;
+        ctx.fillRect(px - 3, py - 3, 6, 6);
+        ctx.strokeStyle = `rgba(240, 245, 255, ${alpha})`;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(px - 3, py - 3, 6, 6);
       }
 
       for (const o of s.obstacles) {
