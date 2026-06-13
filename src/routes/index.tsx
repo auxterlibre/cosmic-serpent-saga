@@ -163,7 +163,6 @@ function initialState() {
     projectiles: [] as Projectile[],
     alive: true,
     score: 0,
-    inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
     scrap: 0,
     // Upgrade levels (number of times bought; affects next cost)
     lvlFireRate: 1,
