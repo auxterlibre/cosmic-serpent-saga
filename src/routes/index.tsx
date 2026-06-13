@@ -406,6 +406,36 @@ function Game() {
       const hy = head.y;
       const PICK = 1.2;
 
+      // Self-collision: if the head bites its own body, all segments from the
+      // bitten one onward detach and scatter as loot the player can collect again.
+      {
+        const SELF_HIT = 0.7;
+        const SELF_HIT2 = SELF_HIT * SELF_HIT;
+        // Skip the first few segments — they naturally trail right behind the head.
+        for (let i = 4; i < s.snake.length; i++) {
+          const seg = s.snake[i];
+          const dx = seg.x - hx;
+          const dy = seg.y - hy;
+          if (dx * dx + dy * dy <= SELF_HIT2) {
+            const detached = s.snake.splice(i);
+            for (const d of detached) {
+              let rar: Rarity = "common";
+              for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === d.color) { rar = r; break; }
+              const jx = (Math.random() - 0.5) * 1.2;
+              const jy = (Math.random() - 0.5) * 1.2;
+              s.loot.push({
+                x: Math.max(0, Math.min(WORLD_W - 1, d.x + jx)),
+                y: Math.max(0, Math.min(WORLD_H - 1, d.y + jy)),
+                color: d.color,
+                rarity: rar,
+              });
+            }
+            break;
+          }
+        }
+      }
+
+
       let hudDirty = false;
       for (let i = s.loot.length - 1; i >= 0; i--) {
         const l = s.loot[i];
