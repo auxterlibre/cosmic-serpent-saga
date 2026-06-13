@@ -15,9 +15,9 @@ export const Route = createFileRoute("/")({
 const CELL = 20;
 const WORLD_W = 100;
 const WORLD_H = 100;
-const PLAYER_SPEED = 8.5; // cells per second
-const TURN_RATE = 8.5; // radians per second (max turn speed)
-const SEG_SPACING = 0.85; // distance between snake body segments (in cells)
+const BASE_PLAYER_SPEED = 8.5; // cells per second
+const TURN_RATE = 8.5;
+const SEG_SPACING = 0.85;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 25;
 const BIG_OBSTACLE_RATIO = 0.3;
@@ -25,17 +25,16 @@ const HUNTER_COUNT = 8;
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
+type Rarity = "common" | "uncommon" | "rare" | "epic";
 type Vec = { x: number; y: number };
-type Colored = { x: number; y: number; color: string };
+type Colored = { x: number; y: number; color: string; rarity: Rarity };
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Colored[]; stolenColors: string[]; fleeing: boolean; fleeTarget: Vec | null };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
-type Scrap = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string };
 
-// Direction vectors for keyboard (combine for diagonals)
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
   ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
@@ -44,19 +43,41 @@ const KEY_DIR: Record<string, { x: number; y: number }> = {
 };
 
 const SEG_COLOR_DEFAULT = "#3aa8b8";
-const LOOT_PALETTE = ["#f5d142", "#7df9ff", "#a855f7", "#ff7fb6", "#5dffa0", "#ffa64d"];
-const pickLootColor = () => LOOT_PALETTE[Math.floor(Math.random() * LOOT_PALETTE.length)];
 
-function rand(n: number) {
-  return Math.floor(Math.random() * n);
+const RARITY_INFO: Record<Rarity, { color: string; value: number; weight: number }> = {
+  common:   { color: "#cbd5e1", value: 5,   weight: 0.62 },
+  uncommon: { color: "#4ade80", value: 15,  weight: 0.25 },
+  rare:     { color: "#60a5fa", value: 45,  weight: 0.10 },
+  epic:     { color: "#c084fc", value: 120, weight: 0.03 },
+};
+const RARITY_ORDER: Rarity[] = ["common", "uncommon", "rare", "epic"];
+
+function pickRarity(boost = 0): Rarity {
+  // boost shifts weight towards higher rarities (0..1)
+  const w = { ...RARITY_INFO };
+  let total = 0;
+  const adjusted = RARITY_ORDER.map((r, i) => {
+    const mul = 1 + boost * i;
+    const x = w[r].weight * mul;
+    total += x;
+    return x;
+  });
+  let roll = Math.random() * total;
+  for (let i = 0; i < RARITY_ORDER.length; i++) {
+    roll -= adjusted[i];
+    if (roll <= 0) return RARITY_ORDER[i];
+  }
+  return "common";
 }
-function randPos(): Vec {
-  return { x: rand(WORLD_W), y: rand(WORLD_H) };
+function makeLootItem(boost = 0): Colored {
+  const r = pickRarity(boost);
+  return { ...randPos(), color: RARITY_INFO[r].color, rarity: r };
 }
 
-function makeLoot(): Colored[] {
-  return Array.from({ length: LOOT_COUNT }, () => ({ ...randPos(), color: pickLootColor() }));
-}
+function rand(n: number) { return Math.floor(Math.random() * n); }
+function randPos(): Vec { return { x: rand(WORLD_W), y: rand(WORLD_H) }; }
+
+function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem()); }
 function makeObstacles(): Obstacle[] {
   return Array.from({ length: OBSTACLE_COUNT }, () => {
     const big = Math.random() < BIG_OBSTACLE_RATIO;
@@ -64,7 +85,7 @@ function makeObstacles(): Obstacle[] {
   });
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null }));
+  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -80,30 +101,58 @@ function initialSnake(): Seg[] {
   return arr;
 }
 
+// Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
+// Costs ramp through rarities: common only -> + uncommon -> + rare -> + epic.
+type Cost = Record<Rarity, number>;
+function costFor(level: number): Cost {
+  const c: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+  // L1: 2 com
+  // L2: 3 com
+  // L3: 4 com + 1 unc
+  // L4: 4 com + 2 unc
+  // L5: 4 com + 3 unc + 1 rare
+  // L6: 5 com + 3 unc + 2 rare
+  // L7: 5 com + 4 unc + 2 rare + 1 epic
+  // ... general:
+  c.common = 1 + Math.min(5, level);
+  if (level >= 3) c.uncommon = 1 + Math.floor((level - 3) / 2);
+  if (level >= 5) c.rare = 1 + Math.floor((level - 5) / 2);
+  if (level >= 7) c.epic = 1 + Math.floor((level - 7) / 2);
+  return c;
+}
+function canAfford(inv: Cost, cost: Cost): boolean {
+  return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic;
+}
+function payCost(inv: Cost, cost: Cost) {
+  inv.common -= cost.common; inv.uncommon -= cost.uncommon; inv.rare -= cost.rare; inv.epic -= cost.epic;
+}
+
 function initialState() {
   return {
     snake: initialSnake(),
     headAngle: 0,
     targetAngle: 0,
-    growth: [] as string[], // colors of pending segments to append
+    growth: [] as string[],
     loot: makeLoot(),
     obstacles: makeObstacles(),
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
-    scraps: [] as Scrap[],
     alive: true,
     score: 0,
-    scrap: 0,
-    multishot: 1,
+    inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
+    // Upgrade levels (number of times bought; affects next cost)
+    lvlFireRate: 1,
+    lvlDamage: 1,
+    lvlRange: 1,
+    lvlMultishot: 1,
+    lvlSpeed: 1,
+    // Derived stats
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
-    costFireRate: 2,
-    costDamage: 3,
-    costRange: 2,
-    costMultishot: 6,
-    costRepair: 4,
+    multishot: 1, // = number of simultaneous targets
+    playerSpeed: BASE_PLAYER_SPEED,
     fireTimer: 0,
     hunterTimer: 0,
     paused: true,
@@ -125,19 +174,19 @@ function Game() {
     fireIntervalMs: 2000,
     damage: 1,
     fireRange: 8,
-    costFireRate: 2,
-    costDamage: 3,
-    costRange: 2,
-    scrap: 0,
     multishot: 1,
-    costMultishot: 6,
-    costRepair: 4,
+    playerSpeed: BASE_PLAYER_SPEED,
+    inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
+    lvlFireRate: 1,
+    lvlDamage: 1,
+    lvlRange: 1,
+    lvlMultishot: 1,
+    lvlSpeed: 1,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
 
-  // Input — track held keys; updatePlayer combines them each frame for diagonals.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "r" || e.key === "R") { reset(); return; }
@@ -156,21 +205,17 @@ function Game() {
     };
   }, []);
 
-  // Touch/drag steering: while a pointer is down, the ship continuously
-  // aims toward the pointer position (relative to the ship on screen).
-  // This gives a smooth 360° "spaceship" feel instead of cardinal swipes.
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
     let active = false;
     let startX = 0, startY = 0;
     let steering = false;
-    const MOVE_THRESHOLD = 10; // px the finger must travel before steering kicks in
+    const MOVE_THRESHOLD = 10;
 
     const aimFromDelta = (dx: number, dy: number) => {
       stateRef.current.targetAngle = Math.atan2(dy, dx);
     };
-
     const onDown = (e: PointerEvent) => {
       active = true;
       steering = false;
@@ -202,7 +247,6 @@ function Game() {
     };
   }, []);
 
-  // Resize
   useEffect(() => {
     const onResize = () => {
       const c = canvasRef.current;
@@ -218,7 +262,7 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
-    setHud({ score: 0, length: 4, alive: true, fireIntervalMs: 2000, damage: 1, fireRange: 8, costFireRate: 2, costDamage: 3, costRange: 2, scrap: 0, multishot: 1, costMultishot: 6, costRepair: 4 });
+    syncHud();
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
@@ -247,52 +291,41 @@ function Game() {
     setShop({ open: false, checkpoint: null });
   }
 
-  function spendSegments(cost: number): boolean {
+  function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed", apply: () => void) {
     const s = stateRef.current;
-    if (s.snake.length - cost < 1) return false;
-    for (let i = 0; i < cost; i++) s.snake.pop();
-    return true;
+    const cost = costFor(s[lvlKey]);
+    if (!canAfford(s.inventory, cost)) return;
+    payCost(s.inventory, cost);
+    apply();
+    s[lvlKey] += 1;
+    syncHud();
   }
 
   function buyFireRate() {
     const s = stateRef.current;
     if (s.fireIntervalMs <= 300) return;
-    if (!spendSegments(s.costFireRate)) return;
-    s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8));
-    s.costFireRate += 1;
-    syncHud();
+    tryBuy("lvlFireRate", () => { s.fireIntervalMs = Math.max(300, Math.round(s.fireIntervalMs * 0.8)); });
   }
   function buyDamage() {
     const s = stateRef.current;
-    if (!spendSegments(s.costDamage)) return;
-    s.damage += 1;
-    s.costDamage += 2;
-    syncHud();
+    tryBuy("lvlDamage", () => { s.damage += 1; });
   }
   function buyRange() {
     const s = stateRef.current;
     if (s.fireRange >= 30) return;
-    if (!spendSegments(s.costRange)) return;
-    s.fireRange += 2;
-    s.costRange += 1;
-    syncHud();
+    tryBuy("lvlRange", () => { s.fireRange += 2; });
   }
   function buyMultishot() {
     const s = stateRef.current;
-    if (s.scrap < s.costMultishot) return;
-    s.scrap -= s.costMultishot;
-    s.multishot += 1;
-    s.costMultishot += 4;
-    syncHud();
+    if (s.multishot >= 6) return;
+    tryBuy("lvlMultishot", () => { s.multishot += 1; });
   }
-  function buyRepair() {
+  function buySpeed() {
     const s = stateRef.current;
-    if (s.scrap < s.costRepair) return;
-    s.scrap -= s.costRepair;
-    const tail = s.snake[s.snake.length - 1];
-    s.snake.push({ x: tail.x, y: tail.y, color: SEG_COLOR_DEFAULT });
-    syncHud();
+    if (s.playerSpeed >= BASE_PLAYER_SPEED * 2) return;
+    tryBuy("lvlSpeed", () => { s.playerSpeed = Math.min(BASE_PLAYER_SPEED * 2, s.playerSpeed + 0.8); });
   }
+
   function syncHud() {
     const s = stateRef.current;
     setHud({
@@ -302,17 +335,17 @@ function Game() {
       fireIntervalMs: s.fireIntervalMs,
       damage: s.damage,
       fireRange: s.fireRange,
-      costFireRate: s.costFireRate,
-      costDamage: s.costDamage,
-      costRange: s.costRange,
-      scrap: s.scrap,
       multishot: s.multishot,
-      costMultishot: s.costMultishot,
-      costRepair: s.costRepair,
+      playerSpeed: s.playerSpeed,
+      inventory: { ...s.inventory },
+      lvlFireRate: s.lvlFireRate,
+      lvlDamage: s.lvlDamage,
+      lvlRange: s.lvlRange,
+      lvlMultishot: s.lvlMultishot,
+      lvlSpeed: s.lvlSpeed,
     });
   }
 
-  // Game loop
   useEffect(() => {
     let raf = 0;
     let last = performance.now();
@@ -322,7 +355,6 @@ function Game() {
       if (!s.alive || s.paused) return;
       const dtSec = dt / 1000;
 
-      // Keyboard: combine held direction keys into a single vector (diagonals work).
       if (s.keys.size > 0) {
         let kx = 0, ky = 0;
         for (const k of s.keys) {
@@ -332,7 +364,6 @@ function Game() {
         if (kx !== 0 || ky !== 0) s.targetAngle = Math.atan2(ky, kx);
       }
 
-      // Smooth angle steering toward target
       let diff = s.targetAngle - s.headAngle;
       while (diff > Math.PI) diff -= Math.PI * 2;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -340,18 +371,15 @@ function Game() {
       if (Math.abs(diff) <= maxTurn) s.headAngle = s.targetAngle;
       else s.headAngle += Math.sign(diff) * maxTurn;
 
-      // Move head forward
       const head = s.snake[0];
-      const step = PLAYER_SPEED * dtSec;
+      const step = s.playerSpeed * dtSec;
       head.x += Math.cos(s.headAngle) * step;
       head.y += Math.sin(s.headAngle) * step;
 
-      // Wall = death
       if (head.x < 0 || head.y < 0 || head.x >= WORLD_W || head.y >= WORLD_H) {
         s.alive = false; syncHud(); return;
       }
 
-      // Chain follow: each segment pulled to maintain SEG_SPACING from previous
       for (let i = 1; i < s.snake.length; i++) {
         const prev = s.snake[i - 1];
         const cur = s.snake[i];
@@ -365,7 +393,6 @@ function Game() {
         }
       }
 
-      // Grow: append pending segments at tail, preserving their color
       while (s.growth.length > 0 && s.snake.length > 0) {
         const tail = s.snake[s.snake.length - 1];
         const color = s.growth.shift()!;
@@ -376,36 +403,21 @@ function Game() {
       const hy = head.y;
       const PICK = 1.2;
 
-      // Loot collisions
       let hudDirty = false;
       for (let i = s.loot.length - 1; i >= 0; i--) {
         const l = s.loot[i];
         const dx = (l.x + 0.5) - hx;
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
-          const color = l.color;
           s.loot.splice(i, 1);
-          // Respawn fresh loot somewhere else with a new random color
-          s.loot.push({ ...randPos(), color: pickLootColor() });
-          s.score += 10;
-          s.growth.push(color);
+          s.loot.push(makeLootItem());
+          s.score += RARITY_INFO[l.rarity].value;
+          s.inventory[l.rarity] += 1;
+          s.growth.push(l.color);
           hudDirty = true;
         }
       }
 
-      // Scrap collisions
-      for (let i = s.scraps.length - 1; i >= 0; i--) {
-        const sc = s.scraps[i];
-        const dx = sc.x - hx;
-        const dy = sc.y - hy;
-        if (dx * dx + dy * dy <= PICK * PICK) {
-          s.scraps.splice(i, 1);
-          s.scrap += 1;
-          hudDirty = true;
-        }
-      }
-
-      // Obstacle collisions (shrinks)
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
         const size = o.big ? 2 : 1;
@@ -425,7 +437,6 @@ function Game() {
         }
       }
 
-      // Checkpoints (with hysteresis so closing doesn't immediately reopen)
       const CP_TRIGGER = PICK;
       const CP_RELEASE = PICK + 1.2;
       for (let i = 0; i < s.checkpoints.length; i++) {
@@ -501,14 +512,15 @@ function Game() {
             const last0 = h.trail[0];
             if (!last0 || Math.hypot(h.x - last0.x, h.y - last0.y) >= 1) {
               const cIdx = h.trail.length;
-              const color = h.stolenColors[cIdx] ?? SEG_COLOR_DEFAULT;
-              h.trail.unshift({ x: h.x, y: h.y, color });
+              const st = h.stolen[cIdx];
+              h.trail.unshift({ x: h.x, y: h.y, color: st?.color ?? SEG_COLOR_DEFAULT, rarity: st?.rarity ?? "common" });
             }
-            const maxTrail = Math.max(0, h.stolenColors.length);
+            const maxTrail = Math.max(0, h.stolen.length);
             if (h.trail.length > maxTrail) h.trail.length = maxTrail;
-            // Refresh trail colors so they match stolenColors order
             for (let ti = 0; ti < h.trail.length; ti++) {
-              h.trail[ti].color = h.stolenColors[ti] ?? SEG_COLOR_DEFAULT;
+              const st = h.stolen[ti];
+              h.trail[ti].color = st?.color ?? SEG_COLOR_DEFAULT;
+              h.trail[ti].rarity = st?.rarity ?? "common";
             }
           }
 
@@ -517,7 +529,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
               }
             }
             continue;
@@ -539,14 +551,17 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
               }
               syncHud();
               continue;
             } else if (hitIdx > 0) {
-              const stolen = s.snake.splice(hitIdx, 1)[0];
+              const stolenSeg = s.snake.splice(hitIdx, 1)[0];
               h.hp += 1;
-              h.stolenColors.unshift(stolen.color);
+              // Find matching rarity from color (default common)
+              let rar: Rarity = "common";
+              for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === stolenSeg.color) { rar = r; break; }
+              h.stolen.unshift({ color: stolenSeg.color, rarity: rar });
               h.cooldown = 400;
               h.fleeing = true;
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
@@ -564,41 +579,40 @@ function Game() {
         if (head) {
           const rangeSq = s.fireRange * s.fireRange;
           const PROJ_SPEED = 45;
-          type T = { x: number; y: number; d2: number };
-          let best: T | null = null;
-          const consider = (cx: number, cy: number, vx = 0, vy = 0) => {
-            const dx = cx - head.x;
-            const dy = cy - head.y;
-            const d2 = dx * dx + dy * dy;
-            if (d2 > rangeSq) return;
-            const t = Math.sqrt(d2) / PROJ_SPEED;
-            const px = cx + vx * t;
-            const py = cy + vy * t;
-            if (!best || d2 < best.d2) best = { x: px, y: py, d2 };
-          };
+          // Find up to `multishot` distinct nearest hunters in range, then fire one
+          // aimed (lead-predicted) projectile at EACH. No spread — every shot tracks
+          // a real enemy so multi-shot becomes multi-target.
+          type Cand = { h: Hunter; d2: number };
+          const cands: Cand[] = [];
           for (const h of s.hunters) {
-            const vx = Math.cos(h.angle) * HUNTER_SPEED;
-            const vy = Math.sin(h.angle) * HUNTER_SPEED;
-            consider(h.x + 0.5, h.y + 0.5, vx, vy);
+            const dx = (h.x + 0.5) - head.x;
+            const dy = (h.y + 0.5) - head.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= rangeSq) cands.push({ h, d2 });
           }
-          if (best) {
+          if (cands.length > 0) {
+            cands.sort((a, b) => a.d2 - b.d2);
+            const n = Math.min(s.multishot, cands.length);
             s.fireTimer = 0;
-            const b: T = best;
-            const dx = b.x - head.x;
-            const dy = b.y - head.y;
-            const len = Math.hypot(dx, dy) || 1;
             const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
-            const baseAngle = Math.atan2(dy, dx);
-            const shots = Math.max(1, s.multishot);
-            const spread = 0.18; // radians between adjacent shots
-            for (let si = 0; si < shots; si++) {
-              const offset = (si - (shots - 1) / 2) * spread;
-              const a = baseAngle + offset;
+            for (let i = 0; i < n; i++) {
+              const tgt = cands[i].h;
+              const cx = tgt.x + 0.5;
+              const cy = tgt.y + 0.5;
+              const vxT = Math.cos(tgt.angle) * HUNTER_SPEED * (tgt.fleeing ? 1.15 : 1);
+              const vyT = Math.sin(tgt.angle) * HUNTER_SPEED * (tgt.fleeing ? 1.15 : 1);
+              const d = Math.sqrt(cands[i].d2);
+              const t = d / PROJ_SPEED;
+              const px = cx + vxT * t;
+              const py = cy + vyT * t;
+              const dx = px - head.x;
+              const dy = py - head.y;
+              const len = Math.hypot(dx, dy) || 1;
               s.projectiles.push({
                 x: head.x,
                 y: head.y,
-                vx: Math.cos(a) * PROJ_SPEED,
-                vy: Math.sin(a) * PROJ_SPEED,
+                vx: (dx / len) * PROJ_SPEED,
+                vy: (dy / len) * PROJ_SPEED,
                 life: lifeMs,
               });
             }
@@ -626,20 +640,29 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
-                // Drop stolen segments back as loot (collectable again)
-                for (const c of h.stolenColors) {
+                // Drop stolen segments back as loot with original rarity
+                for (const st of h.stolen) {
                   const jitter = () => (Math.random() - 0.5) * 0.6;
-                  s.loot.push({ x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())), y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())), color: c });
+                  s.loot.push({
+                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())),
+                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())),
+                    color: st.color,
+                    rarity: st.rarity,
+                  });
                 }
-                // Drop scrap parts
-                const scrapCount = 1 + Math.floor(Math.random() * 3);
-                for (let k = 0; k < scrapCount; k++) {
-                  const ang = Math.random() * Math.PI * 2;
-                  const spd = 1 + Math.random() * 2;
-                  s.scraps.push({ x: h.x + 0.5, y: h.y + 0.5, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd, life: 15000 });
+                // Bonus drop: a single piece of loot biased toward higher rarities
+                {
+                  const jitter = () => (Math.random() - 0.5) * 0.6;
+                  const r = pickRarity(0.6);
+                  s.loot.push({
+                    x: Math.max(0, Math.min(WORLD_W - 1, h.x + jitter())),
+                    y: Math.max(0, Math.min(WORLD_H - 1, h.y + jitter())),
+                    color: RARITY_INFO[r].color,
+                    rarity: r,
+                  });
                 }
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolenColors: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPos(), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
               }
               return false;
             }
@@ -648,25 +671,12 @@ function Game() {
         p.life -= dt;
         return p.life > 0;
       });
-
-      // Scraps drift to rest with friction and decay
-      for (let i = s.scraps.length - 1; i >= 0; i--) {
-        const sc = s.scraps[i];
-        sc.x += sc.vx * dtSec;
-        sc.y += sc.vy * dtSec;
-        sc.vx *= Math.pow(0.001, dtSec);
-        sc.vy *= Math.pow(0.001, dtSec);
-        sc.life -= dt;
-        if (sc.life <= 0 || sc.x < 0 || sc.y < 0 || sc.x >= WORLD_W || sc.y >= WORLD_H) {
-          s.scraps.splice(i, 1);
-        }
-      }
     };
 
     const loop = (now: number) => {
       let dt = now - last;
       last = now;
-      if (dt > 100) dt = 100; // clamp big stalls
+      if (dt > 100) dt = 100;
       updatePlayer(dt);
       updateRealtime(dt);
       draw();
@@ -733,19 +743,14 @@ function Game() {
         if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
         ctx.fillStyle = l.color;
         ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
-      }
-
-      // Scrap parts — small metallic shards
-      for (const sc of s.scraps) {
-        const px = sc.x * CELL - camX;
-        const py = sc.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
-        const alpha = Math.min(1, sc.life / 2000);
-        ctx.fillStyle = `rgba(180, 200, 220, ${alpha})`;
-        ctx.fillRect(px - 3, py - 3, 6, 6);
-        ctx.strokeStyle = `rgba(240, 245, 255, ${alpha})`;
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px - 3, py - 3, 6, 6);
+        // Halo for higher rarities so the player can spot them
+        if (l.rarity !== "common") {
+          ctx.strokeStyle = l.color;
+          ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+          ctx.globalAlpha = l.rarity === "epic" ? 0.9 : 0.55;
+          ctx.strokeRect(px + 1, py + 1, CELL - 2, CELL - 2);
+          ctx.globalAlpha = 1;
+        }
       }
 
       for (const o of s.obstacles) {
@@ -797,7 +802,6 @@ function Game() {
         ctx.fillRect(px - 2, py - 2, 4, 4);
       }
 
-      // Snake — segment color preserved from the loot that grew it
       const R = CELL * 0.45;
       for (let i = s.snake.length - 1; i >= 0; i--) {
         const seg = s.snake[i];
@@ -812,7 +816,6 @@ function Game() {
       if (s.snake[0]) {
         const hx = s.snake[0].x * CELL - camX;
         const hy = s.snake[0].y * CELL - camY;
-        // Direction indicator (small notch)
         ctx.save();
         ctx.translate(hx, hy);
         ctx.rotate(s.headAngle);
@@ -834,11 +837,50 @@ function Game() {
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // Helper: render a cost as colored rarity chips
+  const renderCost = (cost: Cost) => {
+    const chips: { r: Rarity; n: number }[] = [];
+    for (const r of RARITY_ORDER) if (cost[r] > 0) chips.push({ r, n: cost[r] });
+    return (
+      <span className="inline-flex flex-wrap gap-1">
+        {chips.map(({ r, n }) => (
+          <span
+            key={r}
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+            style={{ backgroundColor: RARITY_INFO[r].color + "22", color: RARITY_INFO[r].color, border: `1px solid ${RARITY_INFO[r].color}55` }}
+          >
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: RARITY_INFO[r].color }} />
+            {n}
+          </span>
+        ))}
+      </span>
+    );
+  };
+
+  const UpgradeButton = ({
+    onClick, level, label, current, disabled, maxed,
+  }: { onClick: () => void; level: number; label: string; current: string; disabled?: boolean; maxed?: boolean }) => {
+    const cost = costFor(level);
+    const afford = canAfford(hud.inventory, cost);
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled || maxed || !afford}
+        className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span>{label} <span className="opacity-50">L{level}</span></span>
+          {maxed ? <span className="text-[11px] opacity-60">MAX</span> : renderCost(cost)}
+        </div>
+        <div className="text-xs opacity-60">{current}</div>
+      </button>
+    );
+  };
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]">
       <canvas ref={canvasRef} className="block touch-none" />
 
-      {/* Small pause button */}
       {started && hud.alive && !shop.open && (
         <button
           onClick={togglePause}
@@ -853,7 +895,6 @@ function Game() {
         </button>
       )}
 
-      {/* Start / instructions screen */}
       {!started && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/70 px-6">
           <div className="w-full max-w-sm rounded-lg border border-cyan-500/40 bg-[#0a0a18] px-6 py-6 font-mono text-cyan-200">
@@ -864,11 +905,10 @@ function Game() {
             <ul className="mt-2 space-y-2 text-sm">
               <li>👆 <span className="opacity-80">Touch & drag</span> anywhere — ship aims toward your finger (360°)</li>
               <li>⌨️ <span className="opacity-80">Arrows or WASD</span> on keyboard</li>
-              <li>💛 Collect loot to grow longer</li>
-              <li>🟧 Hunters chase you — you auto-fire at them</li>
-              <li>⬜ Gray obstacles damage you on contact</li>
+              <li>💎 Collect loot — common, uncommon, rare, epic — to grow and spend at checkpoints</li>
+              <li>🟧 Hunters chase you — you auto-fire at the nearest ones</li>
+              <li>🎯 Multi-shot upgrades let you fire at multiple enemies at once</li>
               <li>🟪 Checkpoints open the upgrade shop</li>
-              <li>❤️ Segments are both your HEALTH and your CURRENCY</li>
             </ul>
 
             <button
@@ -881,7 +921,6 @@ function Game() {
         </div>
       )}
 
-      {/* Pause overlay */}
       {started && paused && hud.alive && !shop.open && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <button
@@ -897,53 +936,53 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-sm rounded-lg border border-fuchsia-500/40 bg-[#100820] px-6 py-5 font-mono text-fuchsia-100">
             <div className="text-xl">CHECKPOINT</div>
-            <div className="mt-1 text-xs opacity-70">Spend segments or scrap to upgrade. Segments = health — don't drop to 0!</div>
-            <div className="mt-4 flex justify-between text-sm">
-              <div>Segments: <span className="text-cyan-300">{hud.length}</span></div>
-              <div>Scrap: <span className="text-slate-200">⚙ {hud.scrap}</span></div>
+            <div className="mt-1 text-xs opacity-70">Spend loot to upgrade. Higher-tier upgrades demand rarer loot.</div>
+
+            <div className="mt-3 flex flex-wrap gap-2 text-xs">
+              {RARITY_ORDER.map((r) => (
+                <span key={r} className="inline-flex items-center gap-1 rounded px-2 py-1"
+                  style={{ backgroundColor: RARITY_INFO[r].color + "1f", border: `1px solid ${RARITY_INFO[r].color}55`, color: RARITY_INFO[r].color }}>
+                  <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: RARITY_INFO[r].color }} />
+                  {r}: {hud.inventory[r]}
+                </span>
+              ))}
             </div>
+
             <div className="mt-4 space-y-2">
-              <button
+              <UpgradeButton
                 onClick={buyFireRate}
-                disabled={hud.length <= hud.costFireRate || hud.fireIntervalMs <= 300}
-                className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
-              >
-                Fire rate +20% — {hud.costFireRate} segments
-                <div className="text-xs opacity-60">Current: {(hud.fireIntervalMs / 1000).toFixed(2)}s</div>
-              </button>
-              <button
+                level={hud.lvlFireRate}
+                label="Fire rate +20%"
+                current={`${(hud.fireIntervalMs / 1000).toFixed(2)}s between volleys`}
+                maxed={hud.fireIntervalMs <= 300}
+              />
+              <UpgradeButton
                 onClick={buyDamage}
-                disabled={hud.length <= hud.costDamage}
-                className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
-              >
-                Damage +1 — {hud.costDamage} segments
-                <div className="text-xs opacity-60">Current: {hud.damage}</div>
-              </button>
-              <button
+                level={hud.lvlDamage}
+                label="Damage +1"
+                current={`Current: ${hud.damage}`}
+              />
+              <UpgradeButton
                 onClick={buyRange}
-                disabled={hud.length <= hud.costRange || hud.fireRange >= 30}
-                className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
-              >
-                Range +2 — {hud.costRange} segments
-                <div className="text-xs opacity-60">Current: {hud.fireRange} cells</div>
-              </button>
-              <div className="pt-2 text-xs uppercase tracking-wider opacity-60">Build with scrap ⚙</div>
-              <button
+                level={hud.lvlRange}
+                label="Range +2"
+                current={`Current: ${hud.fireRange} cells`}
+                maxed={hud.fireRange >= 30}
+              />
+              <UpgradeButton
                 onClick={buyMultishot}
-                disabled={hud.scrap < hud.costMultishot}
-                className="w-full rounded bg-slate-400/20 px-3 py-2 text-left text-sm hover:bg-slate-400/30 disabled:opacity-40"
-              >
-                Multi-shot +1 — {hud.costMultishot} ⚙
-                <div className="text-xs opacity-60">Current: {hud.multishot} projectile{hud.multishot > 1 ? "s" : ""} per shot</div>
-              </button>
-              <button
-                onClick={buyRepair}
-                disabled={hud.scrap < hud.costRepair}
-                className="w-full rounded bg-slate-400/20 px-3 py-2 text-left text-sm hover:bg-slate-400/30 disabled:opacity-40"
-              >
-                Hull repair +1 segment — {hud.costRepair} ⚙
-                <div className="text-xs opacity-60">Restores a body segment</div>
-              </button>
+                level={hud.lvlMultishot}
+                label="Multi-target +1"
+                current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
+                maxed={hud.multishot >= 6}
+              />
+              <UpgradeButton
+                onClick={buySpeed}
+                level={hud.lvlSpeed}
+                label="Ship speed +"
+                current={`Current: ${hud.playerSpeed.toFixed(1)} c/s`}
+                maxed={hud.playerSpeed >= BASE_PLAYER_SPEED * 2}
+              />
             </div>
             <button
               onClick={closeShop}
