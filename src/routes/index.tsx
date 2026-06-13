@@ -132,32 +132,32 @@ function Game() {
     const c = canvasRef.current;
     if (!c) return;
     let active = false;
-    let lastX = 0, lastY = 0;
+    let startX = 0, startY = 0;
+    let steering = false;
+    const MOVE_THRESHOLD = 10; // px the finger must travel before steering kicks in
 
-    const aimAt = (clientX: number, clientY: number) => {
-      const rect = c.getBoundingClientRect();
-      // Ship is drawn at the center of the viewport (camera follows head).
-      const cx = rect.left + rect.width / 2;
-      const cy = rect.top + rect.height / 2;
-      const dx = clientX - cx;
-      const dy = clientY - cy;
-      if (dx * dx + dy * dy < 16) return; // tiny dead-zone at center
+    const aimFromDelta = (dx: number, dy: number) => {
       stateRef.current.targetAngle = Math.atan2(dy, dx);
     };
 
     const onDown = (e: PointerEvent) => {
       active = true;
-      lastX = e.clientX; lastY = e.clientY;
+      steering = false;
+      startX = e.clientX; startY = e.clientY;
       try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch {}
-      aimAt(e.clientX, e.clientY);
       e.preventDefault();
     };
     const onMove = (e: PointerEvent) => {
       if (!active) return;
-      lastX = e.clientX; lastY = e.clientY;
-      aimAt(e.clientX, e.clientY);
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      if (!steering) {
+        if (dx * dx + dy * dy < MOVE_THRESHOLD * MOVE_THRESHOLD) return;
+        steering = true;
+      }
+      aimFromDelta(dx, dy);
     };
-    const onUp = () => { active = false; };
+    const onUp = () => { active = false; steering = false; };
 
     c.addEventListener("pointerdown", onDown);
     c.addEventListener("pointermove", onMove, { passive: false });
