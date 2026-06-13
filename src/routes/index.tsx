@@ -1186,13 +1186,13 @@ function Game() {
       <button
         onClick={onClick}
         disabled={disabled || maxed || !afford}
-        className="w-full rounded bg-fuchsia-500/20 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/30 disabled:opacity-40"
+        className="w-full rounded bg-fuchsia-500/20 px-2 py-1.5 text-left text-xs hover:bg-fuchsia-500/30 disabled:opacity-40 sm:px-3 sm:py-2 sm:text-sm"
       >
         <div className="flex items-center justify-between gap-2">
           <span>{label} <span className="opacity-50">L{level}</span></span>
-          {maxed ? <span className="text-[11px] opacity-60">MAX</span> : renderCost(cost)}
+          {maxed ? <span className="text-[10px] opacity-60 sm:text-[11px]">MAX</span> : renderCost(cost)}
         </div>
-        <div className="text-xs opacity-60">{current}</div>
+        <div className="text-[10px] opacity-60 sm:text-xs">{current}</div>
       </button>
     );
   };
