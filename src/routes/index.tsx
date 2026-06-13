@@ -131,8 +131,8 @@ function Game() {
     if (!c) return;
     let sx = 0, sy = 0, active = false;
     const onDown = (e: PointerEvent) => {
-      if (e.pointerType === "mouse") return;
       active = true; sx = e.clientX; sy = e.clientY;
+      try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch {}
     };
     const onMove = (e: PointerEvent) => {
       if (!active) return;
