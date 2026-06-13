@@ -768,8 +768,13 @@ function Game() {
         for (const t of h.trail) {
           const tx = t.x * CELL + CELL / 2 - camX;
           const ty = t.y * CELL + CELL / 2 - camY;
-          ctx.fillStyle = "#b14a1a";
-          ctx.fillRect(tx - CELL / 2 + 1, ty - CELL / 2 + 1, CELL - 2, CELL - 2);
+          ctx.fillStyle = t.color;
+          ctx.beginPath();
+          ctx.arc(tx, ty, CELL * 0.42, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = "rgba(0,0,0,0.35)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
         }
 
         ctx.save();
