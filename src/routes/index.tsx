@@ -29,7 +29,7 @@ type Vec = { x: number; y: number };
 type Colored = { x: number; y: number; color: string };
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Colored[]; fleeing: boolean; fleeTarget: Vec | null };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Colored[]; stolenColors: string[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Scrap = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
