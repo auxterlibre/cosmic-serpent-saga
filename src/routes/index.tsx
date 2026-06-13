@@ -178,6 +178,7 @@ function Game() {
     multishot: 1,
     playerSpeed: BASE_PLAYER_SPEED,
     inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
+    scrap: 0,
     lvlFireRate: 1,
     lvlDamage: 1,
     lvlRange: 1,
