@@ -103,15 +103,18 @@ function makeHunters(): Hunter[] {
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
-  const minDist = Math.min(WORLD_W, WORLD_H) / (CHECKPOINT_COUNT * 0.6);
-  const minDistSq = minDist * minDist;
+  // Aim for generous spacing; relax gradually if we can't place them.
+  let minDist = Math.min(WORLD_W, WORLD_H) * 0.42;
   let attempts = 0;
-  while (cps.length < CHECKPOINT_COUNT && attempts < 2000) {
+  while (cps.length < CHECKPOINT_COUNT) {
     attempts++;
     const c = { x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) };
-    if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= minDistSq)) {
+    const md2 = minDist * minDist;
+    if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md2)) {
       cps.push(c);
     }
+    if (attempts % 500 === 0) minDist *= 0.9;
+    if (attempts > 5000) break;
   }
   return cps;
 }
@@ -397,6 +400,23 @@ function Game() {
     s.growth.push(RARITY_INFO[to].color);
     syncHud();
   }
+
+  // Breakdown: 1 of a higher rarity -> 2 of the rarity below.
+  const BREAKDOWN_YIELD = 2;
+  function tryBreakdown(from: Rarity) {
+    const idx = RARITY_ORDER.indexOf(from);
+    if (idx <= 0) return;
+    const to = RARITY_ORDER[idx - 1];
+    const s = stateRef.current;
+    const inv = computeInventory(s.snake, s.growth);
+    if (inv[from] < 1) return;
+    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    cost[from] = 1;
+    spendSegments(cost);
+    for (let i = 0; i < BREAKDOWN_YIELD; i++) s.growth.push(RARITY_INFO[to].color);
+    syncHud();
+  }
+
 
   function syncHud() {
     const s = stateRef.current;
@@ -1333,6 +1353,36 @@ function Game() {
                             <span className="opacity-60">→</span>
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
                             <span style={{ color: toInfo.color }}>1 {to}</span>
+                          </span>
+                          <span className="text-[11px] opacity-60">have {have}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 mb-2 text-xs uppercase tracking-wide opacity-70">Break down</div>
+                <div className="space-y-2">
+                  {RARITY_ORDER.slice(1).map((from) => {
+                    const idx = RARITY_ORDER.indexOf(from);
+                    const to = RARITY_ORDER[idx - 1];
+                    const have = hud.inventory[from];
+                    const afford = have >= 1;
+                    const fromInfo = RARITY_INFO[from];
+                    const toInfo = RARITY_INFO[to];
+                    return (
+                      <button
+                        key={from}
+                        onClick={() => tryBreakdown(from)}
+                        disabled={!afford}
+                        className="w-full rounded bg-amber-500/10 px-3 py-2 text-left text-sm hover:bg-amber-500/20 disabled:opacity-40"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
+                            <span style={{ color: fromInfo.color }}>1 {from}</span>
+                            <span className="opacity-60">→</span>
+                            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
+                            <span style={{ color: toInfo.color }}>{BREAKDOWN_YIELD} {to}</span>
                           </span>
                           <span className="text-[11px] opacity-60">have {have}</span>
                         </div>
