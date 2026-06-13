@@ -91,6 +91,7 @@ function initialState() {
     hunterTimer: 0,
     paused: true,
     shopOpen: false,
+    cpCooldown: new Set<number>(),
     manualPause: true,
   };
 }
@@ -343,14 +344,22 @@ function Game() {
         }
       }
 
-      // Checkpoints
+      // Checkpoints (with hysteresis so closing doesn't immediately reopen)
+      const CP_TRIGGER = PICK;
+      const CP_RELEASE = PICK + 1.2;
       for (let i = 0; i < s.checkpoints.length; i++) {
         const cp = s.checkpoints[i];
         const dx = (cp.x + 0.5) - hx;
         const dy = (cp.y + 0.5) - hy;
-        if (dx * dx + dy * dy <= PICK * PICK) {
+        const d2 = dx * dx + dy * dy;
+        if (s.cpCooldown.has(i)) {
+          if (d2 > CP_RELEASE * CP_RELEASE) s.cpCooldown.delete(i);
+          continue;
+        }
+        if (d2 <= CP_TRIGGER * CP_TRIGGER) {
           s.paused = true;
           s.shopOpen = true;
+          s.cpCooldown.add(i);
           setShop({ open: true, checkpoint: i });
           break;
         }
