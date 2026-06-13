@@ -322,6 +322,16 @@ function Game() {
       if (!s.alive || s.paused) return;
       const dtSec = dt / 1000;
 
+      // Keyboard: combine held direction keys into a single vector (diagonals work).
+      if (s.keys.size > 0) {
+        let kx = 0, ky = 0;
+        for (const k of s.keys) {
+          const v = KEY_DIR[k];
+          if (v) { kx += v.x; ky += v.y; }
+        }
+        if (kx !== 0 || ky !== 0) s.targetAngle = Math.atan2(ky, kx);
+      }
+
       // Smooth angle steering toward target
       let diff = s.targetAngle - s.headAngle;
       while (diff > Math.PI) diff -= Math.PI * 2;
@@ -355,11 +365,11 @@ function Game() {
         }
       }
 
-      // Grow: append at tail when growth is pending
-      if (s.growth > 0 && s.snake.length > 0) {
+      // Grow: append pending segments at tail, preserving their color
+      while (s.growth.length > 0 && s.snake.length > 0) {
         const tail = s.snake[s.snake.length - 1];
-        s.snake.push({ x: tail.x, y: tail.y });
-        s.growth -= 1;
+        const color = s.growth.shift()!;
+        s.snake.push({ x: tail.x, y: tail.y, color });
       }
 
       const hx = head.x;
@@ -373,10 +383,24 @@ function Game() {
         const dx = (l.x + 0.5) - hx;
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
+          const color = l.color;
           s.loot.splice(i, 1);
-          s.loot.push(randPos());
+          // Respawn fresh loot somewhere else with a new random color
+          s.loot.push({ ...randPos(), color: pickLootColor() });
           s.score += 10;
-          s.growth += 1;
+          s.growth.push(color);
+          hudDirty = true;
+        }
+      }
+
+      // Scrap collisions
+      for (let i = s.scraps.length - 1; i >= 0; i--) {
+        const sc = s.scraps[i];
+        const dx = sc.x - hx;
+        const dy = sc.y - hy;
+        if (dx * dx + dy * dy <= PICK * PICK) {
+          s.scraps.splice(i, 1);
+          s.scrap += 1;
           hudDirty = true;
         }
       }
