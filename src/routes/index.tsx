@@ -26,17 +26,26 @@ const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
 type Vec = { x: number; y: number };
+type Colored = { x: number; y: number; color: string };
 
 type Obstacle = { x: number; y: number; big: boolean };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Vec[]; fleeing: boolean; fleeTarget: Vec | null };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: Colored[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
+type Scrap = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
+type Seg = { x: number; y: number; color: string };
 
-const KEY_ANGLE: Record<string, number> = {
-  ArrowUp: -Math.PI / 2, ArrowDown: Math.PI / 2, ArrowLeft: Math.PI, ArrowRight: 0,
-  w: -Math.PI / 2, s: Math.PI / 2, a: Math.PI, d: 0,
-  W: -Math.PI / 2, S: Math.PI / 2, A: Math.PI, D: 0,
+// Direction vectors for keyboard (combine for diagonals)
+const KEY_DIR: Record<string, { x: number; y: number }> = {
+  ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
+  ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 },
+  w: { x: 0, y: -1 }, s: { x: 0, y: 1 }, a: { x: -1, y: 0 }, d: { x: 1, y: 0 },
+  W: { x: 0, y: -1 }, S: { x: 0, y: 1 }, A: { x: -1, y: 0 }, D: { x: 1, y: 0 },
 };
+
+const SEG_COLOR_DEFAULT = "#3aa8b8";
+const LOOT_PALETTE = ["#f5d142", "#7df9ff", "#a855f7", "#ff7fb6", "#5dffa0", "#ffa64d"];
+const pickLootColor = () => LOOT_PALETTE[Math.floor(Math.random() * LOOT_PALETTE.length)];
 
 function rand(n: number) {
   return Math.floor(Math.random() * n);
