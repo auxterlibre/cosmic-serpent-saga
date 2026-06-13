@@ -453,7 +453,7 @@ function Game() {
         const SELF_HIT = 0.7;
         const SELF_HIT2 = SELF_HIT * SELF_HIT;
         // Skip the first few segments — they naturally trail right behind the head.
-        for (let i = 4; i < s.snake.length; i++) {
+        for (let i = 3; i < s.snake.length; i++) {
           const seg = s.snake[i];
           const dx = seg.x - hx;
           const dy = seg.y - hy;
