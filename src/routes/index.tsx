@@ -370,6 +370,10 @@ function Game() {
     if (s.playerSpeed >= BASE_PLAYER_SPEED * 2) return;
     tryBuy("lvlSpeed", () => { s.playerSpeed = Math.min(BASE_PLAYER_SPEED * 2, s.playerSpeed + 0.8); });
   }
+  function buyCap() {
+    const s = stateRef.current;
+    tryBuy("lvlCap", () => { s.segCap += 2; });
+  }
 
   // Crafting: 3 of a lower rarity -> 1 of the next rarity up.
   const CRAFT_COST = 3;
