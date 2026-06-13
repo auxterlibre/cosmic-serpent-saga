@@ -741,14 +741,31 @@ function Game() {
         const px = l.x * CELL - camX;
         const py = l.y * CELL - camY;
         if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+        const cx = px + CELL / 2;
+        const cy = py + CELL / 2;
+        const r = CELL / 2 - 3;
+        // Diamond (rotated square) so loot reads as distinct from obstacles/cells
         ctx.fillStyle = l.color;
-        ctx.fillRect(px + 3, py + 3, CELL - 6, CELL - 6);
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r);
+        ctx.lineTo(cx + r, cy);
+        ctx.lineTo(cx, cy + r);
+        ctx.lineTo(cx - r, cy);
+        ctx.closePath();
+        ctx.fill();
         // Halo for higher rarities so the player can spot them
         if (l.rarity !== "common") {
+          const r2 = r + 2;
           ctx.strokeStyle = l.color;
           ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
           ctx.globalAlpha = l.rarity === "epic" ? 0.9 : 0.55;
-          ctx.strokeRect(px + 1, py + 1, CELL - 2, CELL - 2);
+          ctx.beginPath();
+          ctx.moveTo(cx, cy - r2);
+          ctx.lineTo(cx + r2, cy);
+          ctx.lineTo(cx, cy + r2);
+          ctx.lineTo(cx - r2, cy);
+          ctx.closePath();
+          ctx.stroke();
           ctx.globalAlpha = 1;
         }
       }
