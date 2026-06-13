@@ -206,6 +206,8 @@ function Game() {
     lvlRange: 1,
     lvlMultishot: 1,
     lvlSpeed: 1,
+    lvlCap: 1,
+    segCap: INITIAL_CAP,
   });
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
