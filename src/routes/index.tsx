@@ -821,38 +821,99 @@ function Game() {
       camY = Math.max(0, Math.min(WORLD_H * CELL - wViewH, camY));
 
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = "#0a0a18";
+      ctx.fillStyle = "#05060f";
       ctx.fillRect(0, 0, viewW, viewH);
       ctx.setTransform(zoom, 0, 0, zoom, 0, 0);
 
-      ctx.fillStyle = "#1a1a3a";
-      const startX = Math.floor(camX / 40) * 40;
-      const startY = Math.floor(camY / 40) * 40;
-      for (let x = startX; x < camX + wViewW; x += 40) {
-        for (let y = startY; y < camY + wViewH; y += 40) {
+      // Starfield with two layers (parallax-ish via density + size)
+      const sxStart = Math.floor(camX / 40) * 40;
+      const syStart = Math.floor(camY / 40) * 40;
+      for (let x = sxStart; x < camX + wViewW; x += 40) {
+        for (let y = syStart; y < camY + wViewH; y += 40) {
           const hx = ((x * 73856093) ^ (y * 19349663)) >>> 0;
-          if (hx % 7 === 0) ctx.fillRect(x - camX, y - camY, 2, 2);
+          const m = hx % 23;
+          if (m === 0) {
+            ctx.fillStyle = "#8a8acc";
+            ctx.fillRect(x - camX, y - camY, 2, 2);
+          } else if (m < 4) {
+            ctx.fillStyle = "#2a2a55";
+            ctx.fillRect(x - camX, y - camY, 1, 1);
+          } else if (m === 5) {
+            // distant cross star
+            ctx.strokeStyle = "#3d3d7a";
+            ctx.lineWidth = 1;
+            const cx0 = x - camX, cy0 = y - camY;
+            ctx.beginPath();
+            ctx.moveTo(cx0 - 2, cy0); ctx.lineTo(cx0 + 2, cy0);
+            ctx.moveTo(cx0, cy0 - 2); ctx.lineTo(cx0, cy0 + 2);
+            ctx.stroke();
+          }
         }
       }
 
-      ctx.strokeStyle = "#3a3a6a";
+      // World border — dashed neon frame
+      ctx.strokeStyle = "#4a4a8a";
       ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
       ctx.strokeRect(-camX, -camY, WORLD_W * CELL, WORLD_H * CELL);
+      ctx.setLineDash([]);
 
+      // ---- Checkpoints: space stations ----
+      const stationPulse = (performance.now() / 600) % (Math.PI * 2);
       for (const cp of s.checkpoints) {
         const px = cp.x * CELL - camX;
         const py = cp.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
-        ctx.fillStyle = "#a855f7";
-        ctx.fillRect(px, py, CELL, CELL);
+        if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW + CELL || py > wViewH + CELL) continue;
+        const cx = px + CELL / 2;
+        const cy = py + CELL / 2;
+        const r = CELL * 0.55;
+        // outer ring
         ctx.strokeStyle = "#f0abfc";
-        ctx.lineWidth = 2;
-        ctx.strokeRect(px + 2, py + 2, CELL - 4, CELL - 4);
-        ctx.fillStyle = "#fff";
-        ctx.font = "bold 12px monospace";
-        ctx.fillText("$", px + 7, py + 14);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
+        ctx.stroke();
+        // hub octagon (outline)
+        ctx.strokeStyle = "#d8b4fe";
+        ctx.fillStyle = "#1a0b2e";
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
+          const x = cx + Math.cos(a) * r;
+          const y = cy + Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // solar panels (struts)
+        ctx.strokeStyle = "#a855f7";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(cx - r - 4, cy); ctx.lineTo(cx - r - 8, cy);
+        ctx.moveTo(cx + r + 4, cy); ctx.lineTo(cx + r + 8, cy);
+        ctx.moveTo(cx, cy - r - 4); ctx.lineTo(cx, cy - r - 8);
+        ctx.moveTo(cx, cy + r + 4); ctx.lineTo(cx, cy + r + 8);
+        ctx.stroke();
+        // panel ends
+        ctx.fillStyle = "#7c3aed";
+        ctx.fillRect(cx - r - 10, cy - 3, 3, 6);
+        ctx.fillRect(cx + r + 7, cy - 3, 3, 6);
+        ctx.fillRect(cx - 3, cy - r - 10, 6, 3);
+        ctx.fillRect(cx - 3, cy + r + 7, 6, 3);
+        // central docking light (pulses)
+        const lit = (Math.sin(stationPulse) + 1) / 2;
+        ctx.fillStyle = `rgba(253, 224, 71, ${0.5 + lit * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+        // $ tag
+        ctx.fillStyle = "#fde68a";
+        ctx.font = "bold 9px monospace";
+        ctx.fillText("$", cx - 2.5, cy + 3.5);
       }
 
+      // ---- Loot: crystal shards ----
       for (const l of s.loot) {
         const px = l.x * CELL - camX;
         const py = l.y * CELL - camY;
@@ -860,7 +921,17 @@ function Game() {
         const cx = px + CELL / 2;
         const cy = py + CELL / 2;
         const r = CELL / 2 - 3;
-        // Diamond (rotated square) so loot reads as distinct from obstacles/cells
+        // outer halo glow for higher rarity
+        if (l.rarity !== "common") {
+          ctx.strokeStyle = l.color;
+          ctx.globalAlpha = l.rarity === "epic" ? 0.5 : 0.3;
+          ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+          ctx.beginPath();
+          ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+        // crystal body
         ctx.fillStyle = l.color;
         ctx.beginPath();
         ctx.moveTo(cx, cy - r);
@@ -869,40 +940,76 @@ function Game() {
         ctx.lineTo(cx - r, cy);
         ctx.closePath();
         ctx.fill();
-        // Halo for higher rarities so the player can spot them
-        if (l.rarity !== "common") {
-          const r2 = r + 2;
-          ctx.strokeStyle = l.color;
-          ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
-          ctx.globalAlpha = l.rarity === "epic" ? 0.9 : 0.55;
-          ctx.beginPath();
-          ctx.moveTo(cx, cy - r2);
-          ctx.lineTo(cx + r2, cy);
-          ctx.lineTo(cx, cy + r2);
-          ctx.lineTo(cx - r2, cy);
-          ctx.closePath();
-          ctx.stroke();
-          ctx.globalAlpha = 1;
-        }
+        // facet outline
+        ctx.strokeStyle = "rgba(255,255,255,0.85)";
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        // inner facet lines
+        ctx.strokeStyle = "rgba(255,255,255,0.5)";
+        ctx.beginPath();
+        ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+        ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+        ctx.stroke();
+        // highlight dot
+        ctx.fillStyle = "rgba(255,255,255,0.9)";
+        ctx.fillRect(cx - r / 2, cy - r / 2, 1.5, 1.5);
       }
 
+      // ---- Obstacles: asteroids ----
       for (const o of s.obstacles) {
         const size = 2;
         const px = o.x * CELL - camX;
         const py = o.y * CELL - camY;
         if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
-        ctx.fillStyle = "#5b5b6b";
-        ctx.fillRect(px + 2, py + 2, size * CELL - 4, size * CELL - 4);
-        ctx.strokeStyle = "#c44";
-        ctx.lineWidth = 1;
-        ctx.strokeRect(px + 3, py + 3, size * CELL - 6, size * CELL - 6);
+        const cx = px + size * CELL / 2;
+        const cy = py + size * CELL / 2;
+        const baseR = size * CELL / 2 - 2;
+        // deterministic jagged outline from position hash
+        const seed = ((o.x * 73856093) ^ (o.y * 19349663)) >>> 0;
+        const points = 11;
+        ctx.fillStyle = "#3a3a48";
+        ctx.strokeStyle = "#c0c0d0";
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        for (let i = 0; i < points; i++) {
+          const a = (i / points) * Math.PI * 2;
+          // pseudo-random radius variance per vertex
+          const h = ((seed * (i + 1) * 2654435761) >>> 0) % 1000 / 1000;
+          const r = baseR * (0.72 + h * 0.28);
+          const x = cx + Math.cos(a) * r;
+          const y = cy + Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // craters
+        ctx.fillStyle = "#22222c";
+        for (let i = 0; i < 3; i++) {
+          const h1 = ((seed * (i + 7) * 40503) >>> 0) % 1000 / 1000;
+          const h2 = ((seed * (i + 13) * 90089) >>> 0) % 1000 / 1000;
+          const cr = 1.5 + h1 * 2;
+          const ang = h2 * Math.PI * 2;
+          const dist = baseR * 0.45 * h1;
+          ctx.beginPath();
+          ctx.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, cr, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        // danger rim accent
+        ctx.strokeStyle = "rgba(220, 60, 60, 0.55)";
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(cx, cy, baseR + 1.5, 0, Math.PI * 2);
+        ctx.stroke();
       }
 
+      // ---- Hunters: alien fighters ----
       for (const h of s.hunters) {
         const cx = h.x * CELL + CELL / 2 - camX;
         const cy = h.y * CELL + CELL / 2 - camY;
         if (cx < -CELL * 4 || cy < -CELL * 4 || cx > wViewW + CELL * 4 || cy > wViewH + CELL * 4) continue;
 
+        // stolen segment trail
         for (const t of h.trail) {
           const tx = t.x * CELL + CELL / 2 - camX;
           const ty = t.y * CELL + CELL / 2 - camY;
@@ -910,7 +1017,7 @@ function Game() {
           ctx.beginPath();
           ctx.arc(tx, ty, CELL * 0.42, 0, Math.PI * 2);
           ctx.fill();
-          ctx.strokeStyle = "rgba(0,0,0,0.35)";
+          ctx.strokeStyle = "rgba(255,255,255,0.45)";
           ctx.lineWidth = 1;
           ctx.stroke();
         }
@@ -918,21 +1025,50 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        ctx.fillStyle = "#f97316";
+        const S = CELL / 2;
+        // thruster flare
+        const flareLen = 4 + Math.random() * 4;
+        ctx.fillStyle = "rgba(253, 224, 71, 0.9)";
         ctx.beginPath();
-        ctx.moveTo(CELL / 2 - 2, 0);
-        ctx.lineTo(-CELL / 2 + 2, CELL / 2 - 2);
-        ctx.lineTo(-CELL / 2 + 2, -CELL / 2 + 2);
+        ctx.moveTo(-S, -2);
+        ctx.lineTo(-S - flareLen, 0);
+        ctx.lineTo(-S, 2);
         ctx.closePath();
+        ctx.fill();
+        // hull
+        ctx.fillStyle = h.fleeing ? "#7c2d12" : "#9a3412";
+        ctx.strokeStyle = "#fdba74";
+        ctx.lineWidth = 1.25;
+        ctx.beginPath();
+        ctx.moveTo(S + 2, 0);
+        ctx.lineTo(0, S - 1);
+        ctx.lineTo(-S + 2, S - 2);
+        ctx.lineTo(-S + 4, 0);
+        ctx.lineTo(-S + 2, -(S - 2));
+        ctx.lineTo(0, -(S - 1));
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // cockpit
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.arc(1, 0, 1.8, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
 
-      ctx.fillStyle = "#fde047";
+      // ---- Projectiles: glowing tracers ----
       for (const p of s.projectiles) {
         const px = p.x * CELL - camX;
         const py = p.y * CELL - camY;
-        ctx.fillRect(px - 2, py - 2, 4, 4);
+        ctx.fillStyle = "rgba(253, 224, 71, 0.35)";
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#fef9c3";
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.fill();
       }
 
       const R = CELL * 0.45;
@@ -942,14 +1078,23 @@ function Game() {
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
         const overCap = seg.overCapUntil !== undefined;
-        ctx.fillStyle = i === 0 ? "#7df9ff" : (overCap && blinkOn ? "#ef4444" : seg.color);
+        const isHead = i === 0;
+        const fill = isHead ? "#7df9ff" : (overCap && blinkOn ? "#ef4444" : seg.color);
+        // body
+        ctx.fillStyle = fill;
         ctx.beginPath();
         ctx.arc(px, py, R, 0, Math.PI * 2);
         ctx.fill();
-        if (overCap) {
-          ctx.strokeStyle = "#ef4444";
-          ctx.lineWidth = 2;
-          ctx.stroke();
+        // outline
+        ctx.strokeStyle = overCap ? "#ef4444" : "rgba(255,255,255,0.7)";
+        ctx.lineWidth = overCap ? 2 : 1;
+        ctx.stroke();
+        // inner rivet so segments read as mech parts
+        if (!isHead) {
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.beginPath();
+          ctx.arc(px, py, R * 0.35, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
 
@@ -959,8 +1104,22 @@ function Game() {
         ctx.save();
         ctx.translate(hx, hy);
         ctx.rotate(s.headAngle);
-        ctx.fillStyle = "#e0ffff";
-        ctx.fillRect(R - 4, -2, 6, 4);
+        // visor / cannon
+        ctx.fillStyle = "#0f172a";
+        ctx.strokeStyle = "#e0ffff";
+        ctx.lineWidth = 1;
+        ctx.fillRect(R - 5, -2.5, 7, 5);
+        ctx.strokeRect(R - 5, -2.5, 7, 5);
+        // antenna
+        ctx.strokeStyle = "#7df9ff";
+        ctx.beginPath();
+        ctx.moveTo(-R + 1, 0);
+        ctx.lineTo(-R - 3, 0);
+        ctx.stroke();
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.arc(-R - 4, 0, 1.2, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
 
         ctx.strokeStyle = "rgba(125, 249, 255, 0.18)";
