@@ -293,11 +293,29 @@ function Game() {
     setShop({ open: false, checkpoint: null });
   }
 
+  function spendSegments(cost: Cost) {
+    const s = stateRef.current;
+    for (const r of RARITY_ORDER) {
+      let need = cost[r];
+      if (need <= 0) continue;
+      const color = RARITY_INFO[r].color;
+      // Remove from pending growth queue first
+      for (let i = s.growth.length - 1; i >= 0 && need > 0; i--) {
+        if (s.growth[i] === color) { s.growth.splice(i, 1); need--; }
+      }
+      // Then remove from the tail end of the snake, preserving the first 4 default segments
+      for (let i = s.snake.length - 1; i >= 4 && need > 0; i--) {
+        if (s.snake[i].color === color) { s.snake.splice(i, 1); need--; }
+      }
+    }
+  }
+
   function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed", apply: () => void) {
     const s = stateRef.current;
     const cost = costFor(s[lvlKey]);
     if (!canAfford(s.inventory, cost)) return;
     payCost(s.inventory, cost);
+    spendSegments(cost);
     apply();
     s[lvlKey] += 1;
     syncHud();
