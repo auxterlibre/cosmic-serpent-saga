@@ -1078,14 +1078,23 @@ function Game() {
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
         const overCap = seg.overCapUntil !== undefined;
-        ctx.fillStyle = i === 0 ? "#7df9ff" : (overCap && blinkOn ? "#ef4444" : seg.color);
+        const isHead = i === 0;
+        const fill = isHead ? "#7df9ff" : (overCap && blinkOn ? "#ef4444" : seg.color);
+        // body
+        ctx.fillStyle = fill;
         ctx.beginPath();
         ctx.arc(px, py, R, 0, Math.PI * 2);
         ctx.fill();
-        if (overCap) {
-          ctx.strokeStyle = "#ef4444";
-          ctx.lineWidth = 2;
-          ctx.stroke();
+        // outline
+        ctx.strokeStyle = overCap ? "#ef4444" : "rgba(255,255,255,0.7)";
+        ctx.lineWidth = overCap ? 2 : 1;
+        ctx.stroke();
+        // inner rivet so segments read as mech parts
+        if (!isHead) {
+          ctx.fillStyle = "rgba(0,0,0,0.35)";
+          ctx.beginPath();
+          ctx.arc(px, py, R * 0.35, 0, Math.PI * 2);
+          ctx.fill();
         }
       }
 
@@ -1095,8 +1104,22 @@ function Game() {
         ctx.save();
         ctx.translate(hx, hy);
         ctx.rotate(s.headAngle);
-        ctx.fillStyle = "#e0ffff";
-        ctx.fillRect(R - 4, -2, 6, 4);
+        // visor / cannon
+        ctx.fillStyle = "#0f172a";
+        ctx.strokeStyle = "#e0ffff";
+        ctx.lineWidth = 1;
+        ctx.fillRect(R - 5, -2.5, 7, 5);
+        ctx.strokeRect(R - 5, -2.5, 7, 5);
+        // antenna
+        ctx.strokeStyle = "#7df9ff";
+        ctx.beginPath();
+        ctx.moveTo(-R + 1, 0);
+        ctx.lineTo(-R - 3, 0);
+        ctx.stroke();
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.arc(-R - 4, 0, 1.2, 0, Math.PI * 2);
+        ctx.fill();
         ctx.restore();
 
         ctx.strokeStyle = "rgba(125, 249, 255, 0.18)";
