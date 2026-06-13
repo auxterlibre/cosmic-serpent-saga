@@ -980,6 +980,11 @@ function Game() {
                   {r}: {hud.inventory[r]}
                 </span>
               ))}
+              <span className="inline-flex items-center gap-1 rounded px-2 py-1"
+                style={{ backgroundColor: "#f59e0b1f", border: "1px solid #f59e0b55", color: "#f59e0b" }}>
+                <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: "#f59e0b" }} />
+                scrap: {hud.scrap}
+              </span>
             </div>
 
             <div className="mt-4 space-y-2">
