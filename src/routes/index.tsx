@@ -95,6 +95,30 @@ const OVER_CAP_MS = 5000;
 const START: Vec = { x: WORLD_W / 2, y: WORLD_H / 2 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
+// Returns the inner edge distance from the world boundary at world coords (x,y).
+// The belt occupies the band between the world edge and this inner edge.
+// Corners are rounded inward so the playable area is a rounded rectangle.
+function beltInnerEdge(x: number, y: number): number {
+  const BAND = 6;          // nominal band thickness
+  const CORNER_R = 18;     // corner rounding radius (inward bulge)
+  // distance to nearest edge
+  const dx = Math.min(x, WORLD_W - x);
+  const dy = Math.min(y, WORLD_H - y);
+  let depth = BAND;
+  // if we're near a corner, push the inner edge further in for an organic bulge
+  const cornerNearX = Math.max(0, CORNER_R - dx);
+  const cornerNearY = Math.max(0, CORNER_R - dy);
+  if (cornerNearX > 0 && cornerNearY > 0) {
+    // both close to two edges -> corner: extra inward depth following an arc
+    const k = Math.sqrt(cornerNearX * cornerNearX + cornerNearY * cornerNearY);
+    depth += k * 0.9;
+  }
+  // wavy organic variation along the perimeter
+  const wob = Math.sin(x * 0.18) * 1.2 + Math.cos(y * 0.21) * 1.1 + Math.sin((x + y) * 0.07) * 1.6;
+  depth += wob;
+  return depth;
+}
+
 // Asteroid size variations (in cells).
 const ASTEROID_SIZES = [2.2, 3, 3, 4, 5];
 function pickAsteroidSize(): number {
@@ -102,32 +126,38 @@ function pickAsteroidSize(): number {
 }
 function makeObstacles(): Obstacle[] {
   const list: Obstacle[] = [];
-  // Scattered field asteroids
+  // Scattered field asteroids (kept inside the playable area, away from belt)
   for (let i = 0; i < OBSTACLE_COUNT; i++) {
-    const p = randPosAway(START);
-    // keep field asteroids away from the belt band
-    const margin = 7;
-    const x = Math.min(WORLD_W - margin, Math.max(margin, p.x));
-    const y = Math.min(WORLD_H - margin, Math.max(margin, p.y));
-    list.push({ x, y, size: pickAsteroidSize() });
+    let p = randPosAway(START);
+    for (let tries = 0; tries < 20; tries++) {
+      const dx = Math.min(p.x, WORLD_W - p.x);
+      const dy = Math.min(p.y, WORLD_H - p.y);
+      const inner = Math.max(beltInnerEdge(p.x, p.y), beltInnerEdge(p.x, p.y)) + 3;
+      if (dx > inner && dy > inner) break;
+      p = randPosAway(START);
+    }
+    list.push({ x: p.x, y: p.y, size: pickAsteroidSize() });
   }
-  // Asteroid belt around the world boundaries
-  const BELT_BAND = 5; // band thickness in cells from each edge
-  const BELT_DENSITY = 0.18; // asteroids per cell along the perimeter
-  const perimeter = 2 * (WORLD_W + WORLD_H);
-  const beltCount = Math.floor(perimeter * BELT_DENSITY);
-  for (let i = 0; i < beltCount; i++) {
-    const edge = rand(4);
-    let x = 0, y = 0;
-    const t = Math.random();
-    const band = Math.random() * BELT_BAND;
-    if (edge === 0) { x = t * WORLD_W; y = band; }
-    else if (edge === 1) { x = t * WORLD_W; y = WORLD_H - band; }
-    else if (edge === 2) { x = band; y = t * WORLD_H; }
-    else { x = WORLD_W - band; y = t * WORLD_H; }
-    // bigger, chunkier rocks in the belt
-    const size = Math.random() < 0.35 ? 5 + Math.random() * 2 : 3 + Math.random() * 2;
-    list.push({ x, y, size });
+  // Asteroid belt: dense packing using grid-jitter so the wall is closed.
+  const STEP = 1.4; // grid step in cells; smaller => denser
+  for (let y = 0; y <= WORLD_H; y += STEP) {
+    for (let x = 0; x <= WORLD_W; x += STEP) {
+      const dx = Math.min(x, WORLD_W - x);
+      const dy = Math.min(y, WORLD_H - y);
+      const inner = beltInnerEdge(x, y);
+      // belt occupies band from edge (0) up to `inner`
+      if (dx > inner && dy > inner) continue;
+      // jitter so it doesn't look like a grid
+      const jx = (Math.random() - 0.5) * STEP * 0.9;
+      const jy = (Math.random() - 0.5) * STEP * 0.9;
+      const px = Math.max(0, Math.min(WORLD_W, x + jx));
+      const py = Math.max(0, Math.min(WORLD_H, y + jy));
+      // bigger rocks in deeper belt, smaller near the inner edge
+      const depthFromEdge = Math.min(dx, dy);
+      const t = Math.max(0, Math.min(1, depthFromEdge / Math.max(1, beltInnerEdge(px, py))));
+      const size = (Math.random() < 0.25 ? 5 + Math.random() * 2 : 2.5 + Math.random() * 3) * (1 - t * 0.25);
+      list.push({ x: px, y: py, size });
+    }
   }
   return list;
 }
