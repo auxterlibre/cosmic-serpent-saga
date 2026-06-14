@@ -21,8 +21,8 @@ const SEG_SPACING = 1.15;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
 const HUNTER_MIN = 1;
-const HUNTER_MAX = 10;
-const HUNTER_PER_LOOT = 1 / 3; // +1 hunter per 3 loot segments carried
+const HUNTER_MAX = 20;
+const HUNTER_PER_LOOT = 2 / 3; // +1 hunter per 1.5 loot segments carried
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
