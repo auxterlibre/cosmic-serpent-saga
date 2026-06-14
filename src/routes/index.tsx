@@ -610,7 +610,7 @@ function Game() {
     const s = stateRef.current;
     const inv = computeInventory(s.snake, s.growth);
     if (inv[from] < 1) return;
-    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const cost: Cost = emptyCost();
     cost[from] = 1;
     spendSegments(cost);
     for (let i = 0; i < BREAKDOWN_YIELD; i++) s.growth.push(RARITY_INFO[to].color);
