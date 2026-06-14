@@ -1094,24 +1094,67 @@ function Game() {
 
       const R = CELL * 0.45;
       const blinkOn = Math.floor(performance.now() / 180) % 2 === 0;
-      // Body segments (skip head — drawn as ship below)
+      // Body segments — cargo containers, styled to match the ship's outline look
       for (let i = s.snake.length - 1; i >= 1; i--) {
         const seg = s.snake[i];
         const px = seg.x * CELL - camX;
         const py = seg.y * CELL - camY;
         const overCap = seg.overCapUntil !== undefined;
-        const fill = overCap && blinkOn ? "#ef4444" : seg.color;
-        ctx.fillStyle = fill;
+
+        // Orient container toward the next segment ahead so the trail looks linked
+        const ahead = s.snake[i - 1];
+        const ang = Math.atan2(ahead.y - seg.y, ahead.x - seg.x);
+
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(ang);
+
+        const tint = overCap && blinkOn ? "#ef4444" : seg.color;
+        const outline = overCap ? "#ef4444" : "#7df9ff";
+        const lw = overCap ? 1.6 : 1.1;
+
+        // Crate body
+        ctx.fillStyle = "#0b1a2a";
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = lw;
         ctx.beginPath();
-        ctx.arc(px, py, R, 0, Math.PI * 2);
+        ctx.rect(-R, -R, R * 2, R * 2);
         ctx.fill();
-        ctx.strokeStyle = overCap ? "#ef4444" : "rgba(255,255,255,0.7)";
-        ctx.lineWidth = overCap ? 2 : 1;
         ctx.stroke();
-        ctx.fillStyle = "rgba(0,0,0,0.35)";
+
+        // Colored cargo stripe (rarity tint)
+        ctx.fillStyle = tint;
+        ctx.fillRect(-R, -R * 0.45, R * 2, R * 0.9);
+        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        ctx.lineWidth = 0.8;
         ctx.beginPath();
-        ctx.arc(px, py, R * 0.35, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(-R, -R * 0.45); ctx.lineTo(R, -R * 0.45);
+        ctx.moveTo(-R, R * 0.45); ctx.lineTo(R, R * 0.45);
+        ctx.stroke();
+
+        // Corrugated panel lines
+        ctx.strokeStyle = "rgba(125,249,255,0.35)";
+        ctx.lineWidth = 0.6;
+        for (let k = -1; k <= 1; k += 1) {
+          if (k === 0) continue;
+          ctx.beginPath();
+          ctx.moveTo(k * R * 0.5, -R);
+          ctx.lineTo(k * R * 0.5, -R * 0.45);
+          ctx.moveTo(k * R * 0.5, R * 0.45);
+          ctx.lineTo(k * R * 0.5, R);
+          ctx.stroke();
+        }
+
+        // Corner rivets
+        ctx.fillStyle = outline;
+        const rv = R * 0.14;
+        for (const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]] as const) {
+          ctx.beginPath();
+          ctx.arc(sx * (R - rv * 1.2), sy * (R - rv * 1.2), rv * 0.55, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.restore();
       }
 
       if (s.snake[0]) {
