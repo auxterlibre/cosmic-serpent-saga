@@ -854,7 +854,8 @@ function Game() {
             h.wanderTarget = null;
             let bestD = Infinity;
             let bx = 0, by = 0;
-            for (let i = 0; i < s.snake.length; i++) {
+            // Hunters steal carried cargo; they should never select the ship itself.
+            for (let i = INITIAL_LENGTH; i < s.snake.length; i++) {
               const seg = s.snake[i];
               const ddx = seg.x - (h.x + 0.5);
               const ddy = seg.y - (h.y + 0.5);
@@ -901,7 +902,6 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
               }
             }
             continue;
@@ -918,14 +918,12 @@ function Game() {
               if (ddx * ddx + ddy * ddy <= reach) { hitIdx = i; break; }
             }
             if (hitIdx === 0) {
-              s.snake.pop();
-              if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
-              const idx = s.hunters.indexOf(h);
-              if (idx >= 0) {
-                s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
-              }
-              syncHud();
+              // A hunter bumping the ship should not end the run; only cargo can be stolen.
+              h.cooldown = 650;
+              h.fleeing = true;
+              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
+              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
+              h.fleeTarget = { x: ex, y: ey };
               continue;
             } else if (hitIdx > 0) {
               // Grab the bitten segment AND every segment after it; they become the hunter's tail.
