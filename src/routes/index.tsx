@@ -805,6 +805,35 @@ function Game() {
         }
       }
 
+      // Scrap drops: drift, decelerate, then can be picked up by the head.
+      {
+        const dts = dt / 1000;
+        const SCRAP_PICK = PICK * 1.15;
+        const SCRAP_LIFE = 30000; // 30s on the ground before despawn
+        const nowS = performance.now();
+        for (let i = s.scraps.length - 1; i >= 0; i--) {
+          const sc = s.scraps[i];
+          if (nowS - sc.spawnedAt > SCRAP_LIFE) { s.scraps.splice(i, 1); continue; }
+          sc.x += sc.vx * dts;
+          sc.y += sc.vy * dts;
+          sc.vx *= 0.92;
+          sc.vy *= 0.92;
+          if (sc.x < 0.2) { sc.x = 0.2; sc.vx = 0; }
+          if (sc.y < 0.2) { sc.y = 0.2; sc.vy = 0; }
+          if (sc.x > WORLD_W - 0.2) { sc.x = WORLD_W - 0.2; sc.vx = 0; }
+          if (sc.y > WORLD_H - 0.2) { sc.y = WORLD_H - 0.2; sc.vy = 0; }
+          const dx = sc.x - hx;
+          const dy = sc.y - hy;
+          if (dx * dx + dy * dy <= SCRAP_PICK * SCRAP_PICK) {
+            s.scrap += sc.value;
+            s.pickups.push({ x: sc.x, y: sc.y, t0: nowS, color: SCRAP_COLOR, value: sc.value, rarity: "common" });
+            s.scraps.splice(i, 1);
+            hudDirty = true;
+          }
+        }
+      }
+
+
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
         const size = o.size;
