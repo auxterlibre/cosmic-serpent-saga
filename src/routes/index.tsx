@@ -632,6 +632,40 @@ function Game() {
       {
         const dtSec = dt / 1000;
         const step = HUNTER_SPEED * dtSec;
+
+        // Separation pass: push hunters apart so they don't stack on top of each other.
+        const SEP_DIST = 1.6;
+        const SEP_DIST2 = SEP_DIST * SEP_DIST;
+        for (let i = 0; i < s.hunters.length; i++) {
+          const a = s.hunters[i];
+          for (let j = i + 1; j < s.hunters.length; j++) {
+            const b = s.hunters[j];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < SEP_DIST2 && d2 > 0.0001) {
+              const d = Math.sqrt(d2);
+              const overlap = (SEP_DIST - d) * 0.5;
+              const nx = dx / d;
+              const ny = dy / d;
+              a.x -= nx * overlap;
+              a.y -= ny * overlap;
+              b.x += nx * overlap;
+              b.y += ny * overlap;
+            } else if (d2 <= 0.0001) {
+              // Exactly overlapping — nudge apart in a random direction.
+              const ang = Math.random() * Math.PI * 2;
+              a.x -= Math.cos(ang) * SEP_DIST * 0.5;
+              a.y -= Math.sin(ang) * SEP_DIST * 0.5;
+              b.x += Math.cos(ang) * SEP_DIST * 0.5;
+              b.y += Math.sin(ang) * SEP_DIST * 0.5;
+            }
+          }
+          // Keep inside world bounds after separation.
+          a.x = Math.max(0, Math.min(WORLD_W - 1, a.x));
+          a.y = Math.max(0, Math.min(WORLD_H - 1, a.y));
+        }
+
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
 
@@ -1095,17 +1129,33 @@ function Game() {
         ctx.restore();
       }
 
-      // ---- Projectiles: glowing tracers ----
+      // ---- Projectiles: bright tracer rounds with motion trail ----
       for (const p of s.projectiles) {
         const px = p.x * CELL - camX;
         const py = p.y * CELL - camY;
-        ctx.fillStyle = "rgba(253, 224, 71, 0.35)";
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        const tx = px - (p.vx / sp) * CELL * 0.9;
+        const ty = py - (p.vy / sp) * CELL * 0.9;
+        // Outer glow
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, 14);
+        glow.addColorStop(0, "rgba(255, 240, 120, 0.7)");
+        glow.addColorStop(1, "rgba(255, 200, 0, 0)");
+        ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#fef9c3";
+        // Tracer streak
+        ctx.strokeStyle = "rgba(255, 235, 130, 0.9)";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        // Bright core
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(px, py, 2.6, 0, Math.PI * 2);
         ctx.fill();
       }
 
