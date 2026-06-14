@@ -756,9 +756,38 @@ function Game() {
           // Instant death on any asteroid hit.
           const now = performance.now();
           s.explosions.push({ x: hx, y: hy, t0: now });
-          s.explosions.push({ x: cx, y: cy, t0: now + 60 });
+          s.explosions.push({ x: cx, y: cy, t0: now + 80 });
+          s.explosions.push({ x: cx + (Math.random() - 0.5) * size * 0.4, y: cy + (Math.random() - 0.5) * size * 0.4, t0: now + 200 });
+          // Shatter the asteroid into debris chunks.
+          const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
+          const tintRoll = (seed % 1000) / 1000;
+          const tt = Math.pow(tintRoll, 1.1);
+          const lerp = (a: number, b: number, k: number) => Math.round(a + (b - a) * k);
+          const darkRoll = ((seed * 2246822519) >>> 0) % 1000 / 1000;
+          const shade = darkRoll < 0.35 ? 0.45 + darkRoll * 0.7 : 0.85 + (darkRoll - 0.35) * 0.23;
+          const baseFill = `rgb(${Math.round(lerp(58, 74, tt) * shade)},${Math.round(lerp(58, 58, tt) * shade)},${Math.round(lerp(72, 46, tt) * shade)})`;
+          const craterC = `rgb(${Math.round(lerp(34, 42, tt) * shade)},${Math.round(lerp(34, 31, tt) * shade)},${Math.round(lerp(44, 23, tt) * shade)})`;
+          const pieces = 5 + Math.floor(size * 1.2);
+          for (let k = 0; k < pieces; k++) {
+            const a = (k / pieces) * Math.PI * 2 + Math.random() * 0.6;
+            const sp = 2 + Math.random() * 3.5;
+            s.debris.push({
+              x: cx + Math.cos(a) * size * 0.15,
+              y: cy + Math.sin(a) * size * 0.15,
+              vx: Math.cos(a) * sp,
+              vy: Math.sin(a) * sp,
+              rot: Math.random() * Math.PI * 2,
+              vr: (Math.random() - 0.5) * 6,
+              size: size * (0.18 + Math.random() * 0.22),
+              t0: now,
+              seed: (seed + k * 2654435761) >>> 0,
+              baseFill,
+              craterC,
+            });
+          }
+          s.obstacles.splice(i, 1);
           s.alive = false;
-          setTimeout(syncHud, 900);
+          setTimeout(syncHud, 1500);
           return;
         }
       }
