@@ -1379,15 +1379,15 @@ function Game() {
           const phase = (l.x * 12.9898 + l.y * 78.233) % (Math.PI * 2);
           const pulse = 0.5 + 0.5 * Math.sin(tNow / 380 + phase); // 0..1
           const r = baseR * (0.92 + 0.12 * pulse);
-          const rarityBoost = l.rarity === "epic" ? 1 : l.rarity === "rare" ? 0.7 : l.rarity === "uncommon" ? 0.45 : 0.25;
-          // soft radial glow
-          const glowR = baseR * (1.8 + 0.6 * pulse) * (0.7 + rarityBoost * 0.7);
+          const rarityBoost = l.rarity === "epic" ? 1.2 : l.rarity === "rare" ? 0.9 : l.rarity === "uncommon" ? 0.7 : 0.5;
+          // soft radial glow — always visible, scaled up for rarer loot
+          const glowR = baseR * (1.8 + 0.6 * pulse) * (0.85 + rarityBoost * 0.6);
           const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
           grd.addColorStop(0, l.color + "cc");
-          grd.addColorStop(0.45, l.color + "44");
+          grd.addColorStop(0.45, l.color + "55");
           grd.addColorStop(1, l.color + "00");
           ctx.fillStyle = grd;
-          ctx.globalAlpha = 0.45 + 0.35 * pulse * rarityBoost;
+          ctx.globalAlpha = Math.min(1, 0.4 + 0.45 * pulse * rarityBoost);
           ctx.beginPath();
           ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
           ctx.fill();
