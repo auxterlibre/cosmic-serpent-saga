@@ -1395,13 +1395,19 @@ function Game() {
           `rgb(${lerp(c1[0], c2[0], t)},${lerp(c1[1], c2[1], t)},${lerp(c1[2], c2[2], t)})`;
         const mixA = (c1: [number, number, number], c2: [number, number, number], a: number) =>
           `rgba(${lerp(c1[0], c2[0], t)},${lerp(c1[1], c2[1], t)},${lerp(c1[2], c2[2], t)},${a})`;
-        const baseFill = mix([58, 58, 72], [74, 58, 46]);
-        const strokeC = mix([192, 192, 208], [199, 151, 120]);
-        const craterC = mix([34, 34, 44], [42, 31, 23]);
-        const highlightC = mixA([255, 255, 255], [255, 200, 150], 0.07);
+        // depth variation: some asteroids render darker to sit "behind" others
+        const darkRoll = ((seed * 2246822519) >>> 0) % 1000 / 1000;
+        const shade = darkRoll < 0.35 ? 0.45 + darkRoll * 0.7 : 0.85 + (darkRoll - 0.35) * 0.23;
+        const shadeRgb = (c: [number, number, number]) =>
+          `rgb(${Math.round(lerp(c[0], c[1], t) * shade)},${Math.round(lerp(c[0], c[1], t) * 0 + 0)},0)`;
+        const sh = (r: number, g: number, b: number) =>
+          `rgb(${Math.round(r * shade)},${Math.round(g * shade)},${Math.round(b * shade)})`;
+        const baseRgb: [number, number, number] = [lerp(58, 74, t), lerp(58, 58, t), lerp(72, 46, t)];
+        const craterRgb: [number, number, number] = [lerp(34, 42, t), lerp(34, 31, t), lerp(44, 23, t)];
+        const baseFill = sh(baseRgb[0], baseRgb[1], baseRgb[2]);
+        const craterC = sh(craterRgb[0], craterRgb[1], craterRgb[2]);
+        const highlightC = mixA([255, 255, 255], [255, 200, 150], 0.07 * shade);
         ctx.fillStyle = baseFill;
-        ctx.strokeStyle = strokeC;
-        ctx.lineWidth = 1.25;
         // smooth-ish jagged outline: low-amplitude noise + sine wobble, no spikes
         ctx.beginPath();
         const wob1 = ((seed * 2654435761) >>> 0) % 1000 / 1000;
@@ -1418,7 +1424,6 @@ function Game() {
         }
         ctx.closePath();
         ctx.fill();
-        ctx.stroke();
         // shaded inner highlight for volume
         ctx.fillStyle = highlightC;
         ctx.beginPath();
