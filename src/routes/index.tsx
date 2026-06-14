@@ -720,6 +720,29 @@ function Game() {
         const dtSec = dt / 1000;
         const step = HUNTER_SPEED * dtSec;
 
+        // Scale hunter count with loot carried (excluding the head/ship segment).
+        const loot = Math.max(0, s.snake.length - 1);
+        const desired = Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, HUNTER_MIN + Math.floor(loot * HUNTER_PER_LOOT)));
+        const activeCount = s.hunters.filter((h) => !h.fleeing).length;
+        if (activeCount < desired) {
+          for (let i = 0; i < desired - activeCount; i++) {
+            s.hunters.push({ ...randPosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+          }
+        } else if (activeCount > desired) {
+          let toRemove = activeCount - desired;
+          for (let i = s.hunters.length - 1; i >= 0 && toRemove > 0; i--) {
+            const h = s.hunters[i];
+            if (!h.fleeing && h.stolen.length === 0) {
+              // Send them off-screen so they despawn naturally.
+              h.fleeing = true;
+              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
+              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
+              h.fleeTarget = { x: ex, y: ey };
+              toRemove--;
+            }
+          }
+        }
+
         // Separation pass: push hunters apart so they don't stack on top of each other.
         const SEP_DIST = 1.6;
         const SEP_DIST2 = SEP_DIST * SEP_DIST;
