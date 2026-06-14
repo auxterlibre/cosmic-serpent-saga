@@ -1391,15 +1391,11 @@ function Game() {
         // bias slightly toward slate, but cover the full range
         const t = Math.pow(tintRoll, 1.1);
         const lerp = (a: number, b: number, k: number) => Math.round(a + (b - a) * k);
-        const mix = (c1: [number, number, number], c2: [number, number, number]) =>
-          `rgb(${lerp(c1[0], c2[0], t)},${lerp(c1[1], c2[1], t)},${lerp(c1[2], c2[2], t)})`;
         const mixA = (c1: [number, number, number], c2: [number, number, number], a: number) =>
           `rgba(${lerp(c1[0], c2[0], t)},${lerp(c1[1], c2[1], t)},${lerp(c1[2], c2[2], t)},${a})`;
         // depth variation: some asteroids render darker to sit "behind" others
         const darkRoll = ((seed * 2246822519) >>> 0) % 1000 / 1000;
         const shade = darkRoll < 0.35 ? 0.45 + darkRoll * 0.7 : 0.85 + (darkRoll - 0.35) * 0.23;
-        const shadeRgb = (c: [number, number, number]) =>
-          `rgb(${Math.round(lerp(c[0], c[1], t) * shade)},${Math.round(lerp(c[0], c[1], t) * 0 + 0)},0)`;
         const sh = (r: number, g: number, b: number) =>
           `rgb(${Math.round(r * shade)},${Math.round(g * shade)},${Math.round(b * shade)})`;
         const baseRgb: [number, number, number] = [lerp(58, 74, t), lerp(58, 58, t), lerp(72, 46, t)];
