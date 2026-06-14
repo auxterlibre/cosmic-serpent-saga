@@ -73,9 +73,9 @@ function pickRarity(boost = 0): Rarity {
   }
   return "common";
 }
-function makeLootItem(boost = 0, awayFrom?: Vec): Colored {
+function makeLootItem(boost = 0, awayFrom?: Vec, avoidLoot?: Vec[]): Colored {
   const r = pickRarity(boost);
-  return { ...randPlayablePosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
+  return { ...randPlayablePosAway(awayFrom, SPAWN_MIN_DIST, 3, 1.8, avoidLoot), color: RARITY_INFO[r].color, rarity: r };
 }
 
 function rand(n: number) { return Math.floor(Math.random() * n); }
@@ -111,11 +111,20 @@ function clearOfObstacles(p: Vec, pad = 1.5): boolean {
   return true;
 }
 
-function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8): Vec {
+const LOOT_MIN_SPACING = 4;
+function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
   for (let i = 0; i < 220; i++) {
     const p = randPos();
     if (!isInsidePlayableArea(p, pad)) continue;
     if (!clearOfObstacles(p, astPad)) continue;
+    if (avoidLoot) {
+      let ok = true;
+      for (const q of avoidLoot) {
+        const ddx = p.x - q.x, ddy = p.y - q.y;
+        if (ddx * ddx + ddy * ddy < LOOT_MIN_SPACING * LOOT_MIN_SPACING) { ok = false; break; }
+      }
+      if (!ok) continue;
+    }
     if (!from) return p;
     const dx = p.x - from.x, dy = p.y - from.y;
     if (dx * dx + dy * dy >= minDist * minDist) return p;
@@ -130,7 +139,11 @@ const OVER_CAP_MS = 5000;
 // Player spawns near (but not on top of) the central checkpoint.
 const START: Vec = { x: WORLD_W / 2 + 6, y: WORLD_H / 2 + 4 };
 
-function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
+function makeLoot(): Colored[] {
+  const out: Colored[] = [];
+  for (let i = 0; i < LOOT_COUNT; i++) out.push(makeLootItem(0, START, out));
+  return out;
+}
 // Returns the inner edge distance from the world boundary at world coords (x,y).
 // The belt occupies the band between the world edge and this inner edge.
 // Corners are rounded inward so the playable area is a rounded rectangle.
@@ -733,7 +746,7 @@ function Game() {
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
           s.loot.splice(i, 1);
-          s.loot.push(makeLootItem(0, head));
+          s.loot.push(makeLootItem(0, head, s.loot));
           s.score += RARITY_INFO[l.rarity].value;
           s.growth.push(l.color);
           s.pickups.push({ x: l.x + 0.5, y: l.y + 0.5, t0: performance.now(), color: l.color, value: RARITY_INFO[l.rarity].value, rarity: l.rarity });
@@ -758,6 +771,16 @@ function Game() {
           s.explosions.push({ x: hx, y: hy, t0: now });
           s.explosions.push({ x: cx, y: cy, t0: now + 80 });
           s.explosions.push({ x: cx + (Math.random() - 0.5) * size * 0.4, y: cy + (Math.random() - 0.5) * size * 0.4, t0: now + 200 });
+          // Blow up every cargo segment in sequence from head to tail, then clear the train.
+          for (let k = 1; k < s.snake.length; k++) {
+            const seg = s.snake[k];
+            s.explosions.push({
+              x: seg.x + (Math.random() - 0.5) * 0.4,
+              y: seg.y + (Math.random() - 0.5) * 0.4,
+              t0: now + 40 + k * 90,
+            });
+          }
+          s.snake = [];
           // Shatter the asteroid into debris chunks.
           const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
           const tintRoll = (seed % 1000) / 1000;
@@ -972,7 +995,17 @@ function Game() {
               const head = s.snake[0];
               const now = performance.now();
               s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: now });
-              if (head) s.explosions.push({ x: head.x, y: head.y, t0: now + 60 });
+              if (head) s.explosions.push({ x: head.x, y: head.y, t0: now + 80 });
+              // Chain-detonate the cargo train from head to tail.
+              for (let k = 1; k < s.snake.length; k++) {
+                const seg = s.snake[k];
+                s.explosions.push({
+                  x: seg.x + (Math.random() - 0.5) * 0.4,
+                  y: seg.y + (Math.random() - 0.5) * 0.4,
+                  t0: now + 80 + k * 90,
+                });
+              }
+              s.snake = [];
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
               s.alive = false;
@@ -1346,15 +1379,15 @@ function Game() {
           const phase = (l.x * 12.9898 + l.y * 78.233) % (Math.PI * 2);
           const pulse = 0.5 + 0.5 * Math.sin(tNow / 380 + phase); // 0..1
           const r = baseR * (0.92 + 0.12 * pulse);
-          const rarityBoost = l.rarity === "epic" ? 1 : l.rarity === "rare" ? 0.7 : l.rarity === "uncommon" ? 0.45 : 0.25;
-          // soft radial glow
-          const glowR = baseR * (1.8 + 0.6 * pulse) * (0.7 + rarityBoost * 0.7);
+          const rarityBoost = l.rarity === "epic" ? 1.2 : l.rarity === "rare" ? 0.9 : l.rarity === "uncommon" ? 0.7 : 0.5;
+          // soft radial glow — always visible, scaled up for rarer loot
+          const glowR = baseR * (1.8 + 0.6 * pulse) * (0.85 + rarityBoost * 0.6);
           const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
           grd.addColorStop(0, l.color + "cc");
-          grd.addColorStop(0.45, l.color + "44");
+          grd.addColorStop(0.45, l.color + "55");
           grd.addColorStop(1, l.color + "00");
           ctx.fillStyle = grd;
-          ctx.globalAlpha = 0.45 + 0.35 * pulse * rarityBoost;
+          ctx.globalAlpha = Math.min(1, 0.4 + 0.45 * pulse * rarityBoost);
           ctx.beginPath();
           ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
           ctx.fill();
