@@ -1781,7 +1781,7 @@ function Game() {
 
             <button
               onClick={startGame}
-              className="mt-6 w-full rounded bg-cyan-500/20 px-4 py-3 text-base hover:bg-cyan-500/30"
+              className="mt-6 w-full rounded bg-cyan-500/20 px-4 py-3 text-base transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
             >
               START
             </button>
