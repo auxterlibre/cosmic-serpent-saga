@@ -1683,6 +1683,48 @@ function Game() {
         }
       }
 
+      // ---- Scrap drops: small orange bolts that pulse softly ----
+      {
+        const tNow = performance.now();
+        for (const sc of s.scraps) {
+          const px = sc.x * CELL - camX;
+          const py = sc.y * CELL - camY;
+          if (px < -CELL || py < -CELL || px > wViewW + CELL || py > wViewH + CELL) continue;
+          const age = tNow - sc.spawnedAt;
+          const fadeIn = Math.min(1, age / 250);
+          const lifeLeft = Math.max(0, 1 - Math.max(0, age - 27000) / 3000); // fade last 3s
+          const alpha = fadeIn * lifeLeft;
+          const phase = (sc.x * 12.9898 + sc.y * 78.233) % (Math.PI * 2);
+          const pulse = 0.5 + 0.5 * Math.sin(tNow / 260 + phase);
+          const r = CELL * 0.18 * (0.9 + 0.2 * pulse);
+          // glow
+          const grd = ctx.createRadialGradient(px, py, 0, px, py, r * 3.2);
+          grd.addColorStop(0, SCRAP_COLOR + "cc");
+          grd.addColorStop(0.5, SCRAP_COLOR + "44");
+          grd.addColorStop(1, SCRAP_COLOR + "00");
+          ctx.globalAlpha = 0.65 * alpha;
+          ctx.fillStyle = grd;
+          ctx.beginPath(); ctx.arc(px, py, r * 3.2, 0, Math.PI * 2); ctx.fill();
+          // body — jagged shard
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = SCRAP_COLOR;
+          ctx.strokeStyle = "rgba(255,236,180,0.9)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(px, py - r * 1.2);
+          ctx.lineTo(px + r * 0.9, py - r * 0.2);
+          ctx.lineTo(px + r * 0.5, py + r * 1.1);
+          ctx.lineTo(px - r * 0.7, py + r * 0.6);
+          ctx.lineTo(px - r * 0.8, py - r * 0.4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+
+
+
       // ---- Obstacles: asteroids ----
       for (const o of s.obstacles) {
         const size = o.size;
