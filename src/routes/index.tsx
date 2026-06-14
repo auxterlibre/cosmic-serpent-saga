@@ -1725,7 +1725,7 @@ function Game() {
       <button
         onClick={onClick}
         disabled={disabled || maxed || !afford}
-        className="w-full rounded bg-fuchsia-500/20 px-2 py-1.5 text-left text-xs hover:bg-fuchsia-500/30 disabled:opacity-40 sm:px-3 sm:py-2 sm:text-sm"
+        className="w-full rounded bg-fuchsia-500/20 px-2 py-1.5 text-left text-xs transition-transform duration-75 hover:bg-fuchsia-500/30 active:scale-[0.97] active:brightness-125 disabled:opacity-40 disabled:active:scale-100 sm:px-3 sm:py-2 sm:text-sm"
       >
         <div className="flex items-center justify-between gap-2">
           <span>{label} <span className="opacity-50">L{level}</span></span>
