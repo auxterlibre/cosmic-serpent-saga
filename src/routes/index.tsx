@@ -1063,6 +1063,25 @@ function Game() {
             }
           }
 
+          // Opportunistic loot pickup — grab any loot the hunter passes close to.
+          // Picking up world loot does NOT make the hunter flee (only stealing from the player does).
+          {
+            const grabR2 = 1.1 * 1.1;
+            for (let li = s.loot.length - 1; li >= 0; li--) {
+              const l = s.loot[li];
+              const ddx = (l.x + 0.5) - (h.x + 0.5);
+              const ddy = (l.y + 0.5) - (h.y + 0.5);
+              if (ddx * ddx + ddy * ddy <= grabR2) {
+                h.stolen.push({ color: l.color, rarity: l.rarity });
+                s.loot.splice(li, 1);
+                // Respawn a fresh loot somewhere else so the world stays populated.
+                s.loot.push(makeLootItem(0, s.snake[0] ?? START, s.loot));
+                break; // one pickup per tick keeps it readable
+              }
+            }
+          }
+
+
           if (h.fleeing) {
             if (h.x < -1 || h.y < -1 || h.x > WORLD_W + 1 || h.y > WORLD_H + 1) {
               const idx = s.hunters.indexOf(h);
