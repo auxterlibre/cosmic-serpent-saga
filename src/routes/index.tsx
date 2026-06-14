@@ -13,8 +13,8 @@ export const Route = createFileRoute("/")({
 
 // World/render config
 const CELL = 20;
-const WORLD_W = 100;
-const WORLD_H = 100;
+const WORLD_W = 150;
+const WORLD_H = 150;
 const BASE_PLAYER_SPEED = 8.5; // cells per second
 const TURN_RATE = 8.5;
 const SEG_SPACING = 0.85;
