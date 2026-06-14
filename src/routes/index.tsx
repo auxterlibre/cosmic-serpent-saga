@@ -2096,6 +2096,7 @@ function Game() {
                     label="Multi-target +1"
                     current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
                     maxed={hud.multishot >= 6}
+                    kind="multishot"
                   />
                   <UpgradeButton
                     onClick={buySpeed}
