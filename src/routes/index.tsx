@@ -148,8 +148,34 @@ const OVER_CAP_MS = 5000;
 // Player spawns near (but not on top of) the central checkpoint.
 const START: Vec = { x: WORLD_W / 2 + 6, y: WORLD_H / 2 + 4 };
 
-function makeLoot(): Colored[] {
+function makeStarterLoot(): Colored[] {
+  // Seed a few common loot near the central checkpoint so the player has
+  // immediate pickups within sight of spawn.
+  const center = { x: WORLD_W / 2, y: WORLD_H / 2 };
   const out: Colored[] = [];
+  const target = 6;
+  for (let n = 0; n < target; n++) {
+    for (let tries = 0; tries < 80; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 4.5 + Math.random() * 6;
+      const p = { x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r };
+      if (!isInsidePlayableArea(p, 2.5)) continue;
+      if (!clearOfObstacles(p, 1.6)) continue;
+      let ok = true;
+      for (const q of out) {
+        const dx = p.x - q.x, dy = p.y - q.y;
+        if (dx * dx + dy * dy < LOOT_MIN_SPACING * LOOT_MIN_SPACING) { ok = false; break; }
+      }
+      if (!ok) continue;
+      out.push({ x: p.x, y: p.y, color: RARITY_INFO.common.color, rarity: "common" });
+      break;
+    }
+  }
+  return out;
+}
+
+function makeLoot(): Colored[] {
+  const out: Colored[] = makeStarterLoot();
   for (let i = 0; i < LOOT_COUNT; i++) out.push(makeLootItem(0, START, out));
   return out;
 }
