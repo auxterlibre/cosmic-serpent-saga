@@ -619,12 +619,12 @@ function Game() {
 
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
-        const size = 2;
+        const size = o.size;
         const cx = o.x + size / 2;
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
-        const r = size / 2 + 0.3;
+        const r = size / 2 + 0.2;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
           s.alive = false;
