@@ -547,7 +547,7 @@ function Game() {
       lvlMultishot: "multishot", lvlSpeed: "speed", lvlCap: "cap",
     };
     const cost = costFor(s[lvlKey], kindMap[lvlKey]);
-    const inv = computeInventory(s.snake, s.growth);
+    const inv = computeInventory(s.snake, s.growth, s.scrap);
     if (!canAfford(inv, cost)) return;
     spendSegments(cost);
     apply();
@@ -593,7 +593,7 @@ function Game() {
     if (idx < 0 || idx >= RARITY_ORDER.length - 1) return;
     const to = RARITY_ORDER[idx + 1];
     const s = stateRef.current;
-    const inv = computeInventory(s.snake, s.growth);
+    const inv = computeInventory(s.snake, s.growth, s.scrap);
     if (inv[from] < CRAFT_COST) return;
     const cost: Cost = emptyCost();
     cost[from] = CRAFT_COST;
@@ -610,7 +610,7 @@ function Game() {
     if (idx <= 0) return;
     const to = RARITY_ORDER[idx - 1];
     const s = stateRef.current;
-    const inv = computeInventory(s.snake, s.growth);
+    const inv = computeInventory(s.snake, s.growth, s.scrap);
     if (inv[from] < 1) return;
     const cost: Cost = emptyCost();
     cost[from] = 1;
@@ -632,7 +632,7 @@ function Game() {
       fireRange: s.fireRange,
       multishot: s.multishot,
       playerSpeed: s.playerSpeed,
-      inventory: computeInventory(s.snake, s.growth),
+      inventory: computeInventory(s.snake, s.growth, s.scrap),
       scrap: s.scrap,
       lvlFireRate: s.lvlFireRate,
       lvlDamage: s.lvlDamage,
