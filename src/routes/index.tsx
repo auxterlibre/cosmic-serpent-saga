@@ -614,8 +614,13 @@ function Game() {
       head.x += Math.cos(s.headAngle) * step;
       head.y += Math.sin(s.headAngle) * step;
 
-      if (head.x < 0 || head.y < 0 || head.x >= WORLD_W || head.y >= WORLD_H) {
-        s.alive = false; syncHud(); return;
+      // The visible asteroid belt is the real danger boundary. The raw world
+      // edge is only a safety rail so the run never ends from an invisible line.
+      const EDGE_RAIL = 0.75;
+      if (head.x < EDGE_RAIL || head.y < EDGE_RAIL || head.x > WORLD_W - EDGE_RAIL || head.y > WORLD_H - EDGE_RAIL) {
+        head.x = Math.max(EDGE_RAIL, Math.min(WORLD_W - EDGE_RAIL, head.x));
+        head.y = Math.max(EDGE_RAIL, Math.min(WORLD_H - EDGE_RAIL, head.y));
+        s.targetAngle = Math.atan2(START.y - head.y, START.x - head.x);
       }
 
       for (let i = 1; i < s.snake.length; i++) {
