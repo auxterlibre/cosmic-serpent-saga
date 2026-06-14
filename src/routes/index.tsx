@@ -1102,19 +1102,22 @@ function Game() {
             s.fireTimer = 0;
             const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
             for (let i = 0; i < n; i++) {
-              const tgt = cands[i].h;
-              const cx = tgt.x + 0.5;
-              const cy = tgt.y + 0.5;
-              const vxT = Math.cos(tgt.angle) * HUNTER_SPEED * (tgt.fleeing ? 1.15 : 1);
-              const vyT = Math.sin(tgt.angle) * HUNTER_SPEED * (tgt.fleeing ? 1.15 : 1);
-              const d = Math.sqrt(cands[i].d2);
+              const tgt = cands[i];
+              const d = Math.sqrt(tgt.d2);
               const t = d / PROJ_SPEED;
-              const px = cx + vxT * t;
-              const py = cy + vyT * t;
+              const px = tgt.x + tgt.vx * t;
+              const py = tgt.y + tgt.vy * t;
               const dx = px - head.x;
               const dy = py - head.y;
               const len = Math.hypot(dx, dy) || 1;
               s.projectiles.push({
+                x: head.x,
+                y: head.y,
+                vx: (dx / len) * PROJ_SPEED,
+                vy: (dy / len) * PROJ_SPEED,
+                life: lifeMs,
+              });
+            }
                 x: head.x,
                 y: head.y,
                 vx: (dx / len) * PROJ_SPEED,
