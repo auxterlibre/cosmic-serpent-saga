@@ -339,6 +339,7 @@ function initialState() {
     explosions: [] as Explosion[],
     debris: [] as Debris[],
     pickups: [] as Pickup[],
+    scraps: [] as Scrap[],
     lastHeadX: START.x,
     lastHeadY: START.y,
     alive: true,
