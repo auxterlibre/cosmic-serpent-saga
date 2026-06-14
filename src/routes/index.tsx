@@ -36,6 +36,7 @@ type Projectile = { x: number; y: number; vx: number; vy: number; life: number }
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 type Explosion = { x: number; y: number; t0: number };
+type Pickup = { x: number; y: number; t0: number; color: string; value: number; rarity: Rarity };
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
