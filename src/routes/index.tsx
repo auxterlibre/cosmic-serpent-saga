@@ -523,6 +523,7 @@ function Game() {
 
   function spendSegments(cost: Cost) {
     const s = stateRef.current;
+    if (cost.scrap) s.scrap = Math.max(0, s.scrap - cost.scrap);
     for (const r of RARITY_ORDER) {
       let need = cost[r];
       if (need <= 0) continue;
