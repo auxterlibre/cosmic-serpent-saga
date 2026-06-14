@@ -1427,64 +1427,33 @@ function Game() {
         }
       }
 
-      // ---- Pickups: collection feedback (burst ring + rising +value) ----
+      // ---- Pickups: collection feedback (growing diamond stroke, fading out) ----
       {
         const nowP = performance.now();
-        const PDUR = 700;
+        const PDUR = 550;
         s.pickups = s.pickups.filter((p) => nowP - p.t0 < PDUR);
         for (const p of s.pickups) {
           const t = (nowP - p.t0) / PDUR;
           const px = p.x * CELL - camX;
           const py = p.y * CELL - camY;
           if (px < -60 || py < -60 || px > wViewW + 60 || py > wViewH + 60) continue;
-          const alpha = 1 - t;
-          // expanding ring
-          const ringR = CELL * (0.3 + t * 1.6);
+          // ease-out growth, fade out
+          const ease = 1 - Math.pow(1 - t, 2);
+          const alpha = Math.pow(1 - t, 1.4);
+          const r = CELL * (0.35 + ease * 1.1);
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(Math.PI / 4); // diamond = rotated square
           ctx.strokeStyle = p.color;
-          ctx.globalAlpha = alpha * 0.9;
-          ctx.lineWidth = 2 * (1 - t) + 0.5;
-          ctx.beginPath();
-          ctx.arc(px, py, ringR, 0, Math.PI * 2);
-          ctx.stroke();
-          // soft flash
-          const flashA = Math.max(0, 1 - t * 2.5);
-          if (flashA > 0) {
-            const grd = ctx.createRadialGradient(px, py, 0, px, py, CELL * 0.9);
-            grd.addColorStop(0, p.color + "cc");
-            grd.addColorStop(1, p.color + "00");
-            ctx.fillStyle = grd;
-            ctx.globalAlpha = flashA;
-            ctx.beginPath();
-            ctx.arc(px, py, CELL * 0.9, 0, Math.PI * 2);
-            ctx.fill();
-          }
-          // outward sparks
-          const seed = (Math.floor(p.t0) * 2246822519) >>> 0;
-          const sparks = p.rarity === "epic" ? 10 : p.rarity === "rare" ? 7 : p.rarity === "uncommon" ? 5 : 4;
-          for (let i = 0; i < sparks; i++) {
-            const a = ((seed * (i + 1) * 16807) >>> 0) % 1000 / 1000 * Math.PI * 2;
-            const sp = CELL * (0.5 + ((seed * (i + 3) * 48271) >>> 0) % 1000 / 1000 * 1.2);
-            const sx = px + Math.cos(a) * sp * t;
-            const sy = py + Math.sin(a) * sp * t;
-            ctx.fillStyle = p.color;
-            ctx.globalAlpha = alpha;
-            ctx.fillRect(sx - 1.2, sy - 1.2, 2.4, 2.4);
-          }
-          // rising +value text
-          ctx.globalAlpha = Math.max(0, 1 - t * 1.1);
-          ctx.fillStyle = "#ffffff";
-          ctx.strokeStyle = p.color;
-          ctx.lineWidth = 3;
-          ctx.font = `bold ${12 + (p.rarity === "epic" ? 4 : p.rarity === "rare" ? 2 : 0)}px ui-monospace, monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          const tx = px;
-          const ty = py - 8 - t * 28;
-          ctx.strokeText(`+${p.value}`, tx, ty);
-          ctx.fillText(`+${p.value}`, tx, ty);
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = 2.2 * (1 - t * 0.5) + 0.4;
+          ctx.lineJoin = "round";
+          ctx.strokeRect(-r, -r, r * 2, r * 2);
+          ctx.restore();
           ctx.globalAlpha = 1;
         }
       }
+
 
 
       const R = CELL * 0.45;
