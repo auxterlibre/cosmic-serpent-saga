@@ -689,7 +689,10 @@ function Game() {
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
-        const r = size / 2 + 0.2;
+        // Tight hitbox: asteroid silhouette is jagged (vertices at 0.7–1.02 of
+        // the bounding radius). Use a radius near the inner trough so the
+        // player only dies when actually touching the visible rock.
+        const r = size / 2 * 0.72;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
           s.alive = false;
