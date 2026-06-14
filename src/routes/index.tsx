@@ -126,7 +126,8 @@ function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astP
 const INITIAL_LENGTH = 1;
 const INITIAL_CAP = 6;
 const OVER_CAP_MS = 5000;
-const START: Vec = { x: WORLD_W / 2, y: WORLD_H / 2 };
+// Player spawns near (but not on top of) the central checkpoint.
+const START: Vec = { x: WORLD_W / 2 + 6, y: WORLD_H / 2 + 4 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 // Returns the inner edge distance from the world boundary at world coords (x,y).
@@ -221,34 +222,8 @@ function makeHunters(): Hunter[] {
   return [];
 }
 function makeCheckpoints(): Checkpoint[] {
-  const cps: Checkpoint[] = [];
-  // Aim for generous spacing; relax gradually if we can't place them.
-  let minDist = Math.min(WORLD_W, WORLD_H) * 0.42;
-  // Keep checkpoints clear of the asteroid belt (and a bit of breathing room).
-  let beltPad = 8;
-  let attempts = 0;
-  while (cps.length < CHECKPOINT_COUNT) {
-    attempts++;
-    const c = { x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) };
-    const dx = Math.min(c.x, WORLD_W - c.x);
-    const dy = Math.min(c.y, WORLD_H - c.y);
-    const inner = beltInnerEdge(c.x, c.y);
-    if (dx < inner + beltPad || dy < inner + beltPad) {
-      if (attempts > 4000) beltPad = Math.max(2, beltPad - 1);
-      continue;
-    }
-    if (!clearOfObstacles(c, 3)) {
-      if (attempts > 4000) { /* keep trying with reduced belt pad */ }
-      continue;
-    }
-    const md2 = minDist * minDist;
-    if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md2)) {
-      cps.push(c);
-    }
-    if (attempts % 500 === 0) minDist *= 0.9;
-    if (attempts > 8000) break;
-  }
-  return cps;
+  // A single checkpoint at the center of the map.
+  return [{ x: WORLD_W / 2, y: WORLD_H / 2 }];
 }
 
 function initialSnake(): Seg[] {
@@ -959,13 +934,12 @@ function Game() {
               if (ddx * ddx + ddy * ddy <= reach) { hitIdx = i; break; }
             }
             if (hitIdx === 0) {
-              // A hunter bumping the ship should not end the run; only cargo can be stolen.
-              h.cooldown = 650;
-              h.fleeing = true;
-              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
-              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
-              h.fleeTarget = { x: ex, y: ey };
-              continue;
+              // Ramming the ship destroys both the hunter and the player.
+              const idx = s.hunters.indexOf(h);
+              if (idx >= 0) s.hunters.splice(idx, 1);
+              s.alive = false;
+              syncHud();
+              return;
             } else if (hitIdx > 0) {
               // Grab the bitten segment AND every segment after it; they become the hunter's tail.
               const taken = s.snake.splice(hitIdx);
