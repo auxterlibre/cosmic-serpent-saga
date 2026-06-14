@@ -1160,46 +1160,46 @@ function Game() {
           const ex = ax * (armLen + 3);
           const ey = ay * (armLen + 3);
           if (mod === 0) {
-            // rusty fuel tank
-            ctx.fillStyle = "#7c5a3a";
-            ctx.strokeStyle = "#3f2a1a";
+            // weathered fuel tank
+            ctx.fillStyle = "#4a4640";
+            ctx.strokeStyle = "#2a2622";
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
+            ctx.arc(ex, ey, 5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = "rgba(0,0,0,0.35)";
-            ctx.fillRect(ex - 3.5, ey - 0.5, 7, 1);
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.fillRect(ex - 5, ey - 0.5, 10, 1);
           } else if (mod === 1) {
-            // solar panel (perpendicular plate)
+            // solar panel (perpendicular plate) — muted grey-blue
             ctx.save();
             ctx.translate(ex, ey);
             ctx.rotate(a + Math.PI / 2);
-            ctx.fillStyle = "#1e3a8a";
-            ctx.fillRect(-5, -1.5, 10, 3);
-            ctx.strokeStyle = "#60a5fa";
+            ctx.fillStyle = "#2d343f";
+            ctx.fillRect(-8, -2, 16, 4);
+            ctx.strokeStyle = "#4a5260";
             ctx.lineWidth = 0.5;
-            for (let g = -4; g <= 4; g += 2) {
+            for (let g = -6; g <= 6; g += 2) {
               ctx.beginPath();
-              ctx.moveTo(g, -1.5);
-              ctx.lineTo(g, 1.5);
+              ctx.moveTo(g, -2);
+              ctx.lineTo(g, 2);
               ctx.stroke();
             }
-            ctx.strokeStyle = "#1e293b";
-            ctx.strokeRect(-5, -1.5, 10, 3);
+            ctx.strokeStyle = "#1a1d24";
+            ctx.strokeRect(-8, -2, 16, 4);
             ctx.restore();
           } else {
             // antenna with blinking tip
-            ctx.strokeStyle = "#cbd5e1";
-            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = "#b4b7bd";
+            ctx.lineWidth = 0.9;
             ctx.beginPath();
             ctx.moveTo(ex, ey);
-            ctx.lineTo(ex + ax * 4, ey + ay * 4);
+            ctx.lineTo(ex + ax * 6, ey + ay * 6);
             ctx.stroke();
             const blink = (Math.sin(tStation / 220 + i) + 1) / 2;
-            ctx.fillStyle = `rgba(239,68,68,${0.4 + blink * 0.6})`;
+            ctx.fillStyle = `rgba(220,90,70,${0.35 + blink * 0.55})`;
             ctx.beginPath();
-            ctx.arc(ex + ax * 4, ey + ay * 4, 1.4, 0, Math.PI * 2);
+            ctx.arc(ex + ax * 6, ey + ay * 6, 1.6, 0, Math.PI * 2);
             ctx.fill();
           }
         }
