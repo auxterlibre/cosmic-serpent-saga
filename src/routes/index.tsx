@@ -153,11 +153,11 @@ function makeStarterLoot(): Colored[] {
   // immediate pickups within sight of spawn.
   const center = { x: WORLD_W / 2, y: WORLD_H / 2 };
   const out: Colored[] = [];
-  const target = 6;
+  const target = 3;
   for (let n = 0; n < target; n++) {
     for (let tries = 0; tries < 80; tries++) {
       const a = Math.random() * Math.PI * 2;
-      const r = 4.5 + Math.random() * 6;
+      const r = 9 + Math.random() * 4;
       const p = { x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r };
       if (!isInsidePlayableArea(p, 2.5)) continue;
       if (!clearOfObstacles(p, 1.6)) continue;
