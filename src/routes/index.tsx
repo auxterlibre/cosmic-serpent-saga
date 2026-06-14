@@ -752,6 +752,9 @@ function Game() {
         const r = size / 2 * 0.72;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
+          const now = performance.now();
+          s.explosions.push({ x: hx, y: hy, t0: now });
+          s.explosions.push({ x: cx, y: cy, t0: now + 60 });
           s.alive = false;
           syncHud();
           return;
@@ -935,6 +938,10 @@ function Game() {
             }
             if (hitIdx === 0) {
               // Ramming the ship destroys both the hunter and the player.
+              const head = s.snake[0];
+              const now = performance.now();
+              s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: now });
+              if (head) s.explosions.push({ x: head.x, y: head.y, t0: now + 60 });
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
               s.alive = false;
