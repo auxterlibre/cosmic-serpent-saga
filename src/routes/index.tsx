@@ -74,7 +74,7 @@ function pickRarity(boost = 0): Rarity {
 }
 function makeLootItem(boost = 0, awayFrom?: Vec): Colored {
   const r = pickRarity(boost);
-  return { ...randPosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
+  return { ...randPlayablePosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
 }
 
 function rand(n: number) { return Math.floor(Math.random() * n); }
@@ -90,6 +90,24 @@ function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
     if (dx * dx + dy * dy >= minDist * minDist) return p;
   }
   return randPos();
+}
+
+function isInsidePlayableArea(p: Vec, pad = 3): boolean {
+  const dx = Math.min(p.x, WORLD_W - p.x);
+  const dy = Math.min(p.y, WORLD_H - p.y);
+  const inner = beltInnerEdge(p.x, p.y) + pad;
+  return dx > inner && dy > inner;
+}
+
+function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3): Vec {
+  for (let i = 0; i < 180; i++) {
+    const p = randPos();
+    if (!isInsidePlayableArea(p, pad)) continue;
+    if (!from) return p;
+    const dx = p.x - from.x, dy = p.y - from.y;
+    if (dx * dx + dy * dy >= minDist * minDist) return p;
+  }
+  return { x: WORLD_W / 2 + rand(17) - 8, y: WORLD_H / 2 + rand(17) - 8 };
 }
 
 // Player starts as just the head — no trailing segments.
@@ -188,7 +206,7 @@ function makeObstacles(): Obstacle[] {
   return list;
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_MIN }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null }));
+  return [];
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -298,7 +316,8 @@ function initialState() {
 
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef(initialState());
+  const [initialGameState] = useState(() => initialState());
+  const stateRef = useRef(initialGameState);
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
@@ -595,8 +614,13 @@ function Game() {
       head.x += Math.cos(s.headAngle) * step;
       head.y += Math.sin(s.headAngle) * step;
 
-      if (head.x < 0 || head.y < 0 || head.x >= WORLD_W || head.y >= WORLD_H) {
-        s.alive = false; syncHud(); return;
+      // The visible asteroid belt is the real danger boundary. The raw world
+      // edge is only a safety rail so the run never ends from an invisible line.
+      const EDGE_RAIL = 0.75;
+      if (head.x < EDGE_RAIL || head.y < EDGE_RAIL || head.x > WORLD_W - EDGE_RAIL || head.y > WORLD_H - EDGE_RAIL) {
+        head.x = Math.max(EDGE_RAIL, Math.min(WORLD_W - EDGE_RAIL, head.x));
+        head.y = Math.max(EDGE_RAIL, Math.min(WORLD_H - EDGE_RAIL, head.y));
+        s.targetAngle = Math.atan2(START.y - head.y, START.x - head.x);
       }
 
       for (let i = 1; i < s.snake.length; i++) {
@@ -758,11 +782,11 @@ function Game() {
 
         // Scale hunter count with loot carried (excluding the head/ship segment).
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, HUNTER_MIN + Math.floor(loot * HUNTER_PER_LOOT)));
+        const desired = loot <= 0 ? 0 : Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, Math.ceil(loot * HUNTER_PER_LOOT)));
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
-            s.hunters.push({ ...randPosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+            s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
           }
         } else if (activeCount > desired) {
           let toRemove = activeCount - desired;
@@ -835,7 +859,8 @@ function Game() {
             h.wanderTarget = null;
             let bestD = Infinity;
             let bx = 0, by = 0;
-            for (let i = 0; i < s.snake.length; i++) {
+            // Hunters steal carried cargo; they should never select the ship itself.
+            for (let i = INITIAL_LENGTH; i < s.snake.length; i++) {
               const seg = s.snake[i];
               const ddx = seg.x - (h.x + 0.5);
               const ddy = seg.y - (h.y + 0.5);
@@ -882,7 +907,6 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
               }
             }
             continue;
@@ -899,14 +923,12 @@ function Game() {
               if (ddx * ddx + ddy * ddy <= reach) { hitIdx = i; break; }
             }
             if (hitIdx === 0) {
-              s.snake.pop();
-              if (s.snake.length === 0) { s.alive = false; syncHud(); return; }
-              const idx = s.hunters.indexOf(h);
-              if (idx >= 0) {
-                s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
-              }
-              syncHud();
+              // A hunter bumping the ship should not end the run; only cargo can be stolen.
+              h.cooldown = 650;
+              h.fleeing = true;
+              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
+              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
+              h.fleeTarget = { x: ex, y: ey };
               continue;
             } else if (hitIdx > 0) {
               // Grab the bitten segment AND every segment after it; they become the hunter's tail.
@@ -1010,7 +1032,6 @@ function Game() {
                   });
                 }
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
                 syncHud();
               }
               return false;
