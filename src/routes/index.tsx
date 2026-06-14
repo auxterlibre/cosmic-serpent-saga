@@ -1315,8 +1315,8 @@ function Game() {
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]">
-      <canvas ref={canvasRef} className="block touch-none" />
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+      <canvas ref={canvasRef} className="block touch-none" style={{ touchAction: "none" }} />
 
       {started && hud.alive && !shop.open && (
         <button
