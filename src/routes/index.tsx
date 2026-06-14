@@ -36,6 +36,7 @@ type Projectile = { x: number; y: number; vx: number; vy: number; life: number }
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 type Explosion = { x: number; y: number; t0: number };
+type Pickup = { x: number; y: number; t0: number; color: string; value: number; rarity: Rarity };
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
@@ -267,6 +268,7 @@ function initialState() {
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
     explosions: [] as Explosion[],
+    pickups: [] as Pickup[],
     alive: true,
     score: 0,
     scrap: 0,
@@ -320,6 +322,27 @@ function Game() {
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [flash, setFlash] = useState<Record<string, number>>({});
+  const flashRes = (keys: string[]) => {
+    const now = Date.now();
+    setFlash((f) => {
+      const next = { ...f };
+      for (const k of keys) next[k] = now;
+      return next;
+    });
+    window.setTimeout(() => {
+      setFlash((f) => {
+        const next: Record<string, number> = {};
+        const cutoff = Date.now() - 620;
+        for (const k in f) if (f[k] > cutoff) next[k] = f[k];
+        return next;
+      });
+    }, 640);
+  };
+  const isFlashing = (k: string) => {
+    const t = flash[k];
+    return !!t && Date.now() - t < 620;
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -451,6 +474,7 @@ function Game() {
     apply();
     s[lvlKey] += 1;
     syncHud();
+    flashRes((Object.keys(cost) as Rarity[]).filter((k) => cost[k] > 0));
   }
 
 
@@ -497,6 +521,7 @@ function Game() {
     spendSegments(cost);
     s.growth.push(RARITY_INFO[to].color);
     syncHud();
+    flashRes([from, to]);
   }
 
   // Breakdown: 1 of a higher rarity -> 2 of the rarity below.
@@ -513,6 +538,7 @@ function Game() {
     spendSegments(cost);
     for (let i = 0; i < BREAKDOWN_YIELD; i++) s.growth.push(RARITY_INFO[to].color);
     syncHud();
+    flashRes([from, to]);
   }
 
 
@@ -673,6 +699,7 @@ function Game() {
           s.loot.push(makeLootItem(0, head));
           s.score += RARITY_INFO[l.rarity].value;
           s.growth.push(l.color);
+          s.pickups.push({ x: l.x + 0.5, y: l.y + 0.5, t0: performance.now(), color: l.color, value: RARITY_INFO[l.rarity].value, rarity: l.rarity });
           hudDirty = true;
         }
       }
@@ -1119,46 +1146,88 @@ function Game() {
         ctx.fillText("$", cx - 2.5, cy + 3.5);
       }
 
-      // ---- Loot: crystal shards ----
-      for (const l of s.loot) {
-        const px = l.x * CELL - camX;
-        const py = l.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
-        const cx = px + CELL / 2;
-        const cy = py + CELL / 2;
-        const r = CELL / 2 - 3;
-        // outer halo glow for higher rarity
-        if (l.rarity !== "common") {
-          ctx.strokeStyle = l.color;
-          ctx.globalAlpha = l.rarity === "epic" ? 0.5 : 0.3;
-          ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+      // ---- Loot: crystal shards with VFX ----
+      {
+        const tNow = performance.now();
+        for (const l of s.loot) {
+          const px = l.x * CELL - camX;
+          const py = l.y * CELL - camY;
+          if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+          const cx = px + CELL / 2;
+          const cy = py + CELL / 2;
+          const baseR = CELL / 2 - 3;
+          // per-loot phase from position so they don't all pulse in unison
+          const phase = (l.x * 12.9898 + l.y * 78.233) % (Math.PI * 2);
+          const pulse = 0.5 + 0.5 * Math.sin(tNow / 380 + phase); // 0..1
+          const r = baseR * (0.92 + 0.12 * pulse);
+          const rarityBoost = l.rarity === "epic" ? 1 : l.rarity === "rare" ? 0.7 : l.rarity === "uncommon" ? 0.45 : 0.25;
+          // soft radial glow
+          const glowR = baseR * (1.8 + 0.6 * pulse) * (0.7 + rarityBoost * 0.7);
+          const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+          grd.addColorStop(0, l.color + "cc");
+          grd.addColorStop(0.45, l.color + "44");
+          grd.addColorStop(1, l.color + "00");
+          ctx.fillStyle = grd;
+          ctx.globalAlpha = 0.45 + 0.35 * pulse * rarityBoost;
           ctx.beginPath();
-          ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+          ctx.fill();
           ctx.globalAlpha = 1;
+          // outer halo ring for higher rarity
+          if (l.rarity !== "common") {
+            ctx.strokeStyle = l.color;
+            ctx.globalAlpha = (l.rarity === "epic" ? 0.55 : 0.35) * (0.6 + 0.4 * pulse);
+            ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+            ctx.beginPath();
+            ctx.arc(cx, cy, baseR + 4, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+          // crystal body (gently rotating diamond)
+          const rot = (tNow / 1800 + phase) % (Math.PI * 2);
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(rot * (l.rarity === "common" ? 0 : 0.25));
+          ctx.fillStyle = l.color;
+          ctx.beginPath();
+          ctx.moveTo(0, -r);
+          ctx.lineTo(r, 0);
+          ctx.lineTo(0, r);
+          ctx.lineTo(-r, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.85)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(255,255,255,0.5)";
+          ctx.beginPath();
+          ctx.moveTo(0, -r); ctx.lineTo(0, r);
+          ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
+          ctx.stroke();
+          // shifting highlight
+          const hx2 = -r * 0.35 + Math.cos(tNow / 600 + phase) * r * 0.15;
+          const hy2 = -r * 0.35 + Math.sin(tNow / 600 + phase) * r * 0.15;
+          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          ctx.beginPath();
+          ctx.arc(hx2, hy2, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          // twinkle sparks orbiting higher-rarity loot
+          if (l.rarity !== "common") {
+            const sparks = l.rarity === "epic" ? 4 : l.rarity === "rare" ? 3 : 2;
+            for (let i = 0; i < sparks; i++) {
+              const ang = tNow / 700 + phase + (i / sparks) * Math.PI * 2;
+              const orbit = baseR + 5 + Math.sin(tNow / 300 + i) * 1.6;
+              const sx = cx + Math.cos(ang) * orbit;
+              const sy = cy + Math.sin(ang) * orbit;
+              const sa = 0.5 + 0.5 * Math.sin(tNow / 200 + i * 1.7);
+              ctx.fillStyle = `rgba(255,255,255,${0.7 * sa})`;
+              ctx.beginPath();
+              ctx.arc(sx, sy, 1.1, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
         }
-        // crystal body
-        ctx.fillStyle = l.color;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - r);
-        ctx.lineTo(cx + r, cy);
-        ctx.lineTo(cx, cy + r);
-        ctx.lineTo(cx - r, cy);
-        ctx.closePath();
-        ctx.fill();
-        // facet outline
-        ctx.strokeStyle = "rgba(255,255,255,0.85)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        // inner facet lines
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-        ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
-        ctx.stroke();
-        // highlight dot
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.fillRect(cx - r / 2, cy - r / 2, 1.5, 1.5);
       }
 
       // ---- Obstacles: asteroids ----
@@ -1336,6 +1405,66 @@ function Game() {
           }
         }
       }
+
+      // ---- Pickups: collection feedback (burst ring + rising +value) ----
+      {
+        const nowP = performance.now();
+        const PDUR = 700;
+        s.pickups = s.pickups.filter((p) => nowP - p.t0 < PDUR);
+        for (const p of s.pickups) {
+          const t = (nowP - p.t0) / PDUR;
+          const px = p.x * CELL - camX;
+          const py = p.y * CELL - camY;
+          if (px < -60 || py < -60 || px > wViewW + 60 || py > wViewH + 60) continue;
+          const alpha = 1 - t;
+          // expanding ring
+          const ringR = CELL * (0.3 + t * 1.6);
+          ctx.strokeStyle = p.color;
+          ctx.globalAlpha = alpha * 0.9;
+          ctx.lineWidth = 2 * (1 - t) + 0.5;
+          ctx.beginPath();
+          ctx.arc(px, py, ringR, 0, Math.PI * 2);
+          ctx.stroke();
+          // soft flash
+          const flashA = Math.max(0, 1 - t * 2.5);
+          if (flashA > 0) {
+            const grd = ctx.createRadialGradient(px, py, 0, px, py, CELL * 0.9);
+            grd.addColorStop(0, p.color + "cc");
+            grd.addColorStop(1, p.color + "00");
+            ctx.fillStyle = grd;
+            ctx.globalAlpha = flashA;
+            ctx.beginPath();
+            ctx.arc(px, py, CELL * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // outward sparks
+          const seed = (Math.floor(p.t0) * 2246822519) >>> 0;
+          const sparks = p.rarity === "epic" ? 10 : p.rarity === "rare" ? 7 : p.rarity === "uncommon" ? 5 : 4;
+          for (let i = 0; i < sparks; i++) {
+            const a = ((seed * (i + 1) * 16807) >>> 0) % 1000 / 1000 * Math.PI * 2;
+            const sp = CELL * (0.5 + ((seed * (i + 3) * 48271) >>> 0) % 1000 / 1000 * 1.2);
+            const sx = px + Math.cos(a) * sp * t;
+            const sy = py + Math.sin(a) * sp * t;
+            ctx.fillStyle = p.color;
+            ctx.globalAlpha = alpha;
+            ctx.fillRect(sx - 1.2, sy - 1.2, 2.4, 2.4);
+          }
+          // rising +value text
+          ctx.globalAlpha = Math.max(0, 1 - t * 1.1);
+          ctx.fillStyle = "#ffffff";
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = 3;
+          ctx.font = `bold ${12 + (p.rarity === "epic" ? 4 : p.rarity === "rare" ? 2 : 0)}px ui-monospace, monospace`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          const tx = px;
+          const ty = py - 8 - t * 28;
+          ctx.strokeText(`+${p.value}`, tx, ty);
+          ctx.fillText(`+${p.value}`, tx, ty);
+          ctx.globalAlpha = 1;
+        }
+      }
+
 
       const R = CELL * 0.45;
       const blinkOn = Math.floor(performance.now() / 180) % 2 === 0;
@@ -1596,7 +1725,7 @@ function Game() {
       <button
         onClick={onClick}
         disabled={disabled || maxed || !afford}
-        className="w-full rounded bg-fuchsia-500/20 px-2 py-1.5 text-left text-xs hover:bg-fuchsia-500/30 disabled:opacity-40 sm:px-3 sm:py-2 sm:text-sm"
+        className="w-full rounded bg-fuchsia-500/20 px-2 py-1.5 text-left text-xs transition-transform duration-75 hover:bg-fuchsia-500/30 active:scale-[0.97] active:brightness-125 disabled:opacity-40 disabled:active:scale-100 sm:px-3 sm:py-2 sm:text-sm"
       >
         <div className="flex items-center justify-between gap-2">
           <span>{label} <span className="opacity-50">L{level}</span></span>
@@ -1609,13 +1738,22 @@ function Game() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+      <style>{`
+        @keyframes res-blink {
+          0%, 100% { transform: scale(1); filter: brightness(1); text-shadow: none; }
+          15% { transform: scale(1.35); filter: brightness(1.9); text-shadow: 0 0 10px currentColor, 0 0 18px currentColor; }
+          40% { transform: scale(0.95); filter: brightness(1.3); }
+          65% { transform: scale(1.18); filter: brightness(1.6); text-shadow: 0 0 8px currentColor; }
+        }
+        .res-blink { animation: res-blink 0.6s ease-out; }
+      `}</style>
       <canvas ref={canvasRef} className="block touch-none" style={{ touchAction: "none" }} />
 
       {started && hud.alive && !shop.open && (
         <button
           onClick={togglePause}
           aria-label={paused ? "Resume" : "Pause"}
-          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-500/40 bg-black/50 text-cyan-200 backdrop-blur hover:bg-black/70"
+          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-500/40 bg-black/50 text-cyan-200 backdrop-blur transition-transform duration-75 hover:bg-black/70 active:scale-90 active:brightness-125"
         >
           {paused ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
@@ -1643,7 +1781,7 @@ function Game() {
 
             <button
               onClick={startGame}
-              className="mt-6 w-full rounded bg-cyan-500/20 px-4 py-3 text-base hover:bg-cyan-500/30"
+              className="mt-6 w-full rounded bg-cyan-500/20 px-4 py-3 text-base transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
             >
               START
             </button>
@@ -1655,7 +1793,7 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <button
             onClick={togglePause}
-            className="rounded border border-cyan-500/40 bg-[#0a0a18] px-6 py-3 font-mono text-cyan-200 hover:bg-cyan-500/10"
+            className="rounded border border-cyan-500/40 bg-[#0a0a18] px-6 py-3 font-mono text-cyan-200 transition-transform duration-75 hover:bg-cyan-500/10 active:scale-[0.97] active:brightness-125"
           >
             PAUSED — tap to resume
           </button>
@@ -1670,7 +1808,7 @@ function Game() {
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {RARITY_ORDER.map((r) => (
-                <span key={r} className="inline-flex items-center gap-1 rounded px-2 py-1"
+                <span key={`${r}-${flash[r] ?? 0}`} className={`inline-flex items-center gap-1 rounded px-2 py-1 ${isFlashing(r) ? "res-blink" : ""}`}
                   style={{ backgroundColor: RARITY_INFO[r].color + "1f", border: `1px solid ${RARITY_INFO[r].color}55`, color: RARITY_INFO[r].color }}>
                   <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: RARITY_INFO[r].color }} />
                   {r}: {hud.inventory[r]}
@@ -1748,15 +1886,15 @@ function Game() {
                         key={from}
                         onClick={() => tryCraft(from)}
                         disabled={!afford}
-                        className="w-full rounded bg-fuchsia-500/10 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/20 disabled:opacity-40"
+                        className="w-full rounded bg-fuchsia-500/10 px-3 py-2 text-left text-sm transition-transform duration-75 hover:bg-fuchsia-500/20 active:scale-[0.97] active:brightness-125 disabled:opacity-40 disabled:active:scale-100"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="flex items-center gap-1">
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
-                            <span style={{ color: fromInfo.color }}>{CRAFT_COST} {from}</span>
+                            <span className={isFlashing(from) ? "res-blink inline-block" : "inline-block"} style={{ color: fromInfo.color }}>{CRAFT_COST} {from}</span>
                             <span className="opacity-60">→</span>
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
-                            <span style={{ color: toInfo.color }}>1 {to}</span>
+                            <span className={isFlashing(to) ? "res-blink inline-block" : "inline-block"} style={{ color: toInfo.color }}>1 {to}</span>
                           </span>
                           <span className="text-[11px] opacity-60">have {have}</span>
                         </div>
@@ -1778,15 +1916,15 @@ function Game() {
                         key={from}
                         onClick={() => tryBreakdown(from)}
                         disabled={!afford}
-                        className="w-full rounded bg-amber-500/10 px-3 py-2 text-left text-sm hover:bg-amber-500/20 disabled:opacity-40"
+                        className="w-full rounded bg-amber-500/10 px-3 py-2 text-left text-sm transition-transform duration-75 hover:bg-amber-500/20 active:scale-[0.97] active:brightness-125 disabled:opacity-40 disabled:active:scale-100"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="flex items-center gap-1">
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
-                            <span style={{ color: fromInfo.color }}>1 {from}</span>
+                            <span className={isFlashing(from) ? "res-blink inline-block" : "inline-block"} style={{ color: fromInfo.color }}>1 {from}</span>
                             <span className="opacity-60">→</span>
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
-                            <span style={{ color: toInfo.color }}>{BREAKDOWN_YIELD} {to}</span>
+                            <span className={isFlashing(to) ? "res-blink inline-block" : "inline-block"} style={{ color: toInfo.color }}>{BREAKDOWN_YIELD} {to}</span>
                           </span>
                           <span className="text-[11px] opacity-60">have {have}</span>
                         </div>
@@ -1798,7 +1936,7 @@ function Game() {
             </div>
             <button
               onClick={closeShop}
-              className="mt-4 w-full rounded bg-cyan-500/20 px-3 py-2 text-sm hover:bg-cyan-500/30"
+              className="mt-4 w-full rounded bg-cyan-500/20 px-3 py-2 text-sm transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
             >
               Leave
             </button>
@@ -1813,7 +1951,7 @@ function Game() {
             <div className="mt-2 text-sm opacity-80">Score {hud.score} · Length {hud.length}</div>
             <button
               onClick={reset}
-              className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm hover:bg-cyan-500/30"
+              className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
             >
               Restart
             </button>
