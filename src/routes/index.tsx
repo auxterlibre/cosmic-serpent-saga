@@ -1204,37 +1204,63 @@ function Game() {
           }
         }
 
-        // ---- main hub: irregular, riveted plating ----
-        ctx.fillStyle = "#34373f";
-        ctx.strokeStyle = "#7a7d85";
-        ctx.lineWidth = 1.3;
+        // ---- main hub: octagonal plated core ----
+        const hubR = r * 1.05;
+        ctx.fillStyle = "#3a3d45";
+        ctx.strokeStyle = "#8a8d95";
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        const sides = 7;
+        const sides = 8;
         for (let i = 0; i < sides; i++) {
-          const a = (i / sides) * Math.PI * 2;
-          const wob = 0.82 + (((seed >> (i * 3)) & 0xf) / 15) * 0.32;
-          const x = Math.cos(a) * r * wob;
-          const y = Math.sin(a) * r * wob;
+          const a = (i / sides) * Math.PI * 2 + Math.PI / 8;
+          const x = Math.cos(a) * hubR;
+          const y = Math.sin(a) * hubR;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // patchwork plating seams
-        ctx.strokeStyle = "rgba(140,143,150,0.35)";
-        ctx.lineWidth = 0.7;
+        // inner octagonal panel ring
+        const innerR = hubR * 0.7;
+        ctx.strokeStyle = "rgba(140,143,150,0.55)";
+        ctx.lineWidth = 0.9;
         ctx.beginPath();
-        ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(r * 0.5, -r * 0.1);
-        ctx.moveTo(-r * 0.1, -r * 0.7); ctx.lineTo(0, r * 0.6);
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * Math.PI * 2 + Math.PI / 8;
+          const x = Math.cos(a) * innerR;
+          const y = Math.sin(a) * innerR;
+          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
         ctx.stroke();
 
-        // tiny rivets
-        ctx.fillStyle = "#5a5d65";
-        for (let i = 0; i < 8; i++) {
-          const a = (i / 8) * Math.PI * 2 + 0.3;
-          ctx.fillRect(Math.cos(a) * r * 0.8 - 0.6, Math.sin(a) * r * 0.8 - 0.6, 1.2, 1.2);
+        // radial plating seams from inner ring to outer hull
+        ctx.strokeStyle = "rgba(120,123,130,0.5)";
+        ctx.lineWidth = 0.7;
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * Math.PI * 2 + Math.PI / 8;
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a) * innerR, Math.sin(a) * innerR);
+          ctx.lineTo(Math.cos(a) * hubR, Math.sin(a) * hubR);
+          ctx.stroke();
         }
+
+        // rivets at each vertex
+        ctx.fillStyle = "#6a6d75";
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * Math.PI * 2 + Math.PI / 8;
+          const rx = Math.cos(a) * hubR * 0.88;
+          const ry = Math.sin(a) * hubR * 0.88;
+          ctx.fillRect(rx - 0.7, ry - 0.7, 1.4, 1.4);
+        }
+
+        // small hazard stripe on one panel
+        ctx.save();
+        ctx.rotate(Math.PI / 8);
+        ctx.fillStyle = "rgba(200,170,80,0.55)";
+        ctx.fillRect(hubR * 0.42, -1.2, hubR * 0.28, 2.4);
+        ctx.restore();
 
         // grimy viewport with faint warm interior glow
         const lit = (Math.sin(stationPulse) + 1) / 2;
