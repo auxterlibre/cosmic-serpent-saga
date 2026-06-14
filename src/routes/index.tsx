@@ -268,6 +268,7 @@ function initialState() {
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
     explosions: [] as Explosion[],
+    pickups: [] as Pickup[],
     alive: true,
     score: 0,
     scrap: 0,
