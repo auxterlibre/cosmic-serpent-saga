@@ -47,6 +47,9 @@ type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 type Explosion = { x: number; y: number; t0: number };
 type Debris = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; size: number; t0: number; seed: number; baseFill: string; craterC: string };
 type Pickup = { x: number; y: number; t0: number; color: string; value: number; rarity: Rarity };
+type Scrap = { x: number; y: number; vx: number; vy: number; value: number; spawnedAt: number };
+
+const SCRAP_COLOR = "#f59e0b";
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
