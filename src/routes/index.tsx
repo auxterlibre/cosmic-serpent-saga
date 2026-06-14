@@ -1793,7 +1793,7 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60">
           <button
             onClick={togglePause}
-            className="rounded border border-cyan-500/40 bg-[#0a0a18] px-6 py-3 font-mono text-cyan-200 hover:bg-cyan-500/10"
+            className="rounded border border-cyan-500/40 bg-[#0a0a18] px-6 py-3 font-mono text-cyan-200 transition-transform duration-75 hover:bg-cyan-500/10 active:scale-[0.97] active:brightness-125"
           >
             PAUSED — tap to resume
           </button>
