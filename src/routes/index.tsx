@@ -73,9 +73,9 @@ function pickRarity(boost = 0): Rarity {
   }
   return "common";
 }
-function makeLootItem(boost = 0, awayFrom?: Vec): Colored {
+function makeLootItem(boost = 0, awayFrom?: Vec, avoidLoot?: Vec[]): Colored {
   const r = pickRarity(boost);
-  return { ...randPlayablePosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
+  return { ...randPlayablePosAway(awayFrom, SPAWN_MIN_DIST, 3, 1.8, avoidLoot), color: RARITY_INFO[r].color, rarity: r };
 }
 
 function rand(n: number) { return Math.floor(Math.random() * n); }
