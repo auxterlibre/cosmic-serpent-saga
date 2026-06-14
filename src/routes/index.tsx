@@ -746,7 +746,7 @@ function Game() {
         const dy = (l.y + 0.5) - hy;
         if (dx * dx + dy * dy <= PICK * PICK) {
           s.loot.splice(i, 1);
-          s.loot.push(makeLootItem(0, head));
+          s.loot.push(makeLootItem(0, head, s.loot));
           s.score += RARITY_INFO[l.rarity].value;
           s.growth.push(l.color);
           s.pickups.push({ x: l.x + 0.5, y: l.y + 0.5, t0: performance.now(), color: l.color, value: RARITY_INFO[l.rarity].value, rarity: l.rarity });
