@@ -27,9 +27,9 @@ const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
-const WARDEN_HP = 8;
+const WARDEN_HP = 3;
 const WARDEN_FIRE_INTERVAL = 2200;
-const WARDEN_SHOT_SPEED = 16; // slower than player's 45 so shots can be dodged
+const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
 const WARDEN_PREFERRED_DIST = 12;
 const WARDEN_FIRE_RANGE = 26;
 
@@ -1079,13 +1079,22 @@ function Game() {
           // Find up to `multishot` distinct nearest hunters in range, then fire one
           // aimed (lead-predicted) projectile at EACH. No spread — every shot tracks
           // a real enemy so multi-shot becomes multi-target.
-          type Cand = { h: Hunter; d2: number };
+          type Cand = { x: number; y: number; vx: number; vy: number; d2: number };
           const cands: Cand[] = [];
           for (const h of s.hunters) {
             const dx = (h.x + 0.5) - head.x;
             const dy = (h.y + 0.5) - head.y;
             const d2 = dx * dx + dy * dy;
-            if (d2 <= rangeSq) cands.push({ h, d2 });
+            if (d2 <= rangeSq) {
+              const sp = HUNTER_SPEED * (h.fleeing ? 1.15 : 1);
+              cands.push({ x: h.x + 0.5, y: h.y + 0.5, vx: Math.cos(h.angle) * sp, vy: Math.sin(h.angle) * sp, d2 });
+            }
+          }
+          for (const w of s.wardens) {
+            const dx = (w.x + 0.5) - head.x;
+            const dy = (w.y + 0.5) - head.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= rangeSq) cands.push({ x: w.x + 0.5, y: w.y + 0.5, vx: 0, vy: 0, d2 });
           }
           if (cands.length > 0) {
             cands.sort((a, b) => a.d2 - b.d2);
@@ -1093,15 +1102,11 @@ function Game() {
             s.fireTimer = 0;
             const lifeMs = ((s.fireRange + 2) / PROJ_SPEED) * 1000;
             for (let i = 0; i < n; i++) {
-              const tgt = cands[i].h;
-              const cx = tgt.x + 0.5;
-              const cy = tgt.y + 0.5;
-              const vxT = Math.cos(tgt.angle) * HUNTER_SPEED * (tgt.fleeing ? 1.15 : 1);
-              const vyT = Math.sin(tgt.angle) * HUNTER_SPEED * (tgt.fleeing ? 1.15 : 1);
-              const d = Math.sqrt(cands[i].d2);
+              const tgt = cands[i];
+              const d = Math.sqrt(tgt.d2);
               const t = d / PROJ_SPEED;
-              const px = cx + vxT * t;
-              const py = cy + vyT * t;
+              const px = tgt.x + tgt.vx * t;
+              const py = tgt.y + tgt.vy * t;
               const dx = px - head.x;
               const dy = py - head.y;
               const len = Math.hypot(dx, dy) || 1;
