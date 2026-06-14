@@ -675,6 +675,7 @@ function Game() {
           s.loot.push(makeLootItem(0, head));
           s.score += RARITY_INFO[l.rarity].value;
           s.growth.push(l.color);
+          s.pickups.push({ x: l.x + 0.5, y: l.y + 0.5, t0: performance.now(), color: l.color, value: RARITY_INFO[l.rarity].value, rarity: l.rarity });
           hudDirty = true;
         }
       }
