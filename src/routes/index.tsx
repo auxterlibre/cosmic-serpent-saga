@@ -2412,6 +2412,15 @@ function Game() {
             {n}
           </span>
         ))}
+        {cost.scrap > 0 && (
+          <span
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+            style={{ backgroundColor: SCRAP_COLOR + "22", color: SCRAP_COLOR, border: `1px solid ${SCRAP_COLOR}55` }}
+          >
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: SCRAP_COLOR }} />
+            {cost.scrap}
+          </span>
+        )}
       </span>
     );
   };
