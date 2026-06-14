@@ -1371,17 +1371,29 @@ function Game() {
         const cx = px + size * CELL / 2;
         const cy = py + size * CELL / 2;
         const baseR = size * CELL / 2 - 1;
-        // deterministic jagged outline from position hash
+        // deterministic outline from position hash
         const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
-        const points = 11 + (seed % 5);
-        ctx.fillStyle = "#3a3a48";
-        ctx.strokeStyle = "#c0c0d0";
+        const points = 16 + (seed % 5);
+        // subtle copper-vs-slate tint per asteroid
+        const tintRoll = (seed % 1000) / 1000;
+        const copper = tintRoll < 0.35; // ~35% lean copper
+        const baseFill = copper ? "#4a3a2e" : "#3a3a48";
+        const strokeC = copper ? "#c79778" : "#c0c0d0";
+        const craterC = copper ? "#2a1f17" : "#22222c";
+        const highlightC = copper ? "rgba(255,200,150,0.08)" : "rgba(255,255,255,0.06)";
+        ctx.fillStyle = baseFill;
+        ctx.strokeStyle = strokeC;
         ctx.lineWidth = 1.25;
+        // smooth-ish jagged outline: low-amplitude noise + sine wobble, no spikes
         ctx.beginPath();
-        for (let i = 0; i < points; i++) {
+        const wob1 = ((seed * 2654435761) >>> 0) % 1000 / 1000;
+        const wob2 = ((seed * 40503) >>> 0) % 1000 / 1000;
+        for (let i = 0; i <= points; i++) {
           const a = (i / points) * Math.PI * 2;
           const h = ((seed * (i + 1) * 2654435761) >>> 0) % 1000 / 1000;
-          const r = baseR * (0.7 + h * 0.32);
+          // amplitude clamped small so silhouette stays rounded, never starry
+          const wobble = 0.06 * Math.sin(a * 2 + wob1 * 6.28) + 0.05 * Math.sin(a * 3 + wob2 * 6.28);
+          const r = baseR * (0.93 + wobble + (h - 0.5) * 0.06);
           const x = cx + Math.cos(a) * r;
           const y = cy + Math.sin(a) * r;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -1390,12 +1402,12 @@ function Game() {
         ctx.fill();
         ctx.stroke();
         // shaded inner highlight for volume
-        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.fillStyle = highlightC;
         ctx.beginPath();
         ctx.arc(cx - baseR * 0.25, cy - baseR * 0.25, baseR * 0.55, 0, Math.PI * 2);
         ctx.fill();
         // craters (count scales with size)
-        ctx.fillStyle = "#22222c";
+        ctx.fillStyle = craterC;
         const craters = Math.max(3, Math.floor(size * 1.5));
         for (let i = 0; i < craters; i++) {
           const h1 = ((seed * (i + 7) * 40503) >>> 0) % 1000 / 1000;
