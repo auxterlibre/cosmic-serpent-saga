@@ -758,7 +758,7 @@ function Game() {
         }
       }
 
-      const CP_TRIGGER = PICK + 0.9;
+      const CP_TRIGGER = PICK + 2.7;
       const CP_RELEASE = CP_TRIGGER + 1.2;
       for (let i = 0; i < s.checkpoints.length; i++) {
         const cp = s.checkpoints[i];
@@ -1115,12 +1115,10 @@ function Game() {
         }
       }
 
-      // World border — dashed neon frame
+      // World border — neon frame
       ctx.strokeStyle = "#4a4a8a";
       ctx.lineWidth = 2;
-      ctx.setLineDash([8, 6]);
       ctx.strokeRect(-camX, -camY, WORLD_W * CELL, WORLD_H * CELL);
-      ctx.setLineDash([]);
 
       // ---- Checkpoints: make-shift space stations ----
       const tStation = performance.now();
@@ -1128,13 +1126,13 @@ function Game() {
       for (const cp of s.checkpoints) {
         const px = cp.x * CELL - camX;
         const py = cp.y * CELL - camY;
-        if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW + CELL || py > wViewH + CELL) continue;
+        if (px < -CELL * 4 || py < -CELL * 4 || px > wViewW + CELL * 3 || py > wViewH + CELL * 3) continue;
         const cx = px + CELL / 2;
         const cy = py + CELL / 2;
         // deterministic per-station seed so each looks unique but stable
         const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
         const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
-        const r = CELL * 1.0;
+        const r = CELL * 2.0;
 
         ctx.save();
         ctx.translate(cx, cy);
