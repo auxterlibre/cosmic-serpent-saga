@@ -27,9 +27,9 @@ const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
-const WARDEN_HP = 8;
+const WARDEN_HP = 3;
 const WARDEN_FIRE_INTERVAL = 2200;
-const WARDEN_SHOT_SPEED = 16; // slower than player's 45 so shots can be dodged
+const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
 const WARDEN_PREFERRED_DIST = 12;
 const WARDEN_FIRE_RANGE = 26;
 
