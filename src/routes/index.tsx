@@ -92,7 +92,7 @@ function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
 const INITIAL_LENGTH = 1;
 const INITIAL_CAP = 6;
 const OVER_CAP_MS = 5000;
-const START: Vec = { x: 50, y: 50 };
+const START: Vec = { x: WORLD_W / 2, y: WORLD_H / 2 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 // Asteroid size variations (in cells).
