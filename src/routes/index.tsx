@@ -1122,46 +1122,88 @@ function Game() {
         ctx.fillText("$", cx - 2.5, cy + 3.5);
       }
 
-      // ---- Loot: crystal shards ----
-      for (const l of s.loot) {
-        const px = l.x * CELL - camX;
-        const py = l.y * CELL - camY;
-        if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
-        const cx = px + CELL / 2;
-        const cy = py + CELL / 2;
-        const r = CELL / 2 - 3;
-        // outer halo glow for higher rarity
-        if (l.rarity !== "common") {
-          ctx.strokeStyle = l.color;
-          ctx.globalAlpha = l.rarity === "epic" ? 0.5 : 0.3;
-          ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+      // ---- Loot: crystal shards with VFX ----
+      {
+        const tNow = performance.now();
+        for (const l of s.loot) {
+          const px = l.x * CELL - camX;
+          const py = l.y * CELL - camY;
+          if (px < -CELL || py < -CELL || px > wViewW || py > wViewH) continue;
+          const cx = px + CELL / 2;
+          const cy = py + CELL / 2;
+          const baseR = CELL / 2 - 3;
+          // per-loot phase from position so they don't all pulse in unison
+          const phase = (l.x * 12.9898 + l.y * 78.233) % (Math.PI * 2);
+          const pulse = 0.5 + 0.5 * Math.sin(tNow / 380 + phase); // 0..1
+          const r = baseR * (0.92 + 0.12 * pulse);
+          const rarityBoost = l.rarity === "epic" ? 1 : l.rarity === "rare" ? 0.7 : l.rarity === "uncommon" ? 0.45 : 0.25;
+          // soft radial glow
+          const glowR = baseR * (1.8 + 0.6 * pulse) * (0.7 + rarityBoost * 0.7);
+          const grd = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowR);
+          grd.addColorStop(0, l.color + "cc");
+          grd.addColorStop(0.45, l.color + "44");
+          grd.addColorStop(1, l.color + "00");
+          ctx.fillStyle = grd;
+          ctx.globalAlpha = 0.45 + 0.35 * pulse * rarityBoost;
           ctx.beginPath();
-          ctx.arc(cx, cy, r + 4, 0, Math.PI * 2);
-          ctx.stroke();
+          ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
+          ctx.fill();
           ctx.globalAlpha = 1;
+          // outer halo ring for higher rarity
+          if (l.rarity !== "common") {
+            ctx.strokeStyle = l.color;
+            ctx.globalAlpha = (l.rarity === "epic" ? 0.55 : 0.35) * (0.6 + 0.4 * pulse);
+            ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+            ctx.beginPath();
+            ctx.arc(cx, cy, baseR + 4, 0, Math.PI * 2);
+            ctx.stroke();
+            ctx.globalAlpha = 1;
+          }
+          // crystal body (gently rotating diamond)
+          const rot = (tNow / 1800 + phase) % (Math.PI * 2);
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(rot * (l.rarity === "common" ? 0 : 0.25));
+          ctx.fillStyle = l.color;
+          ctx.beginPath();
+          ctx.moveTo(0, -r);
+          ctx.lineTo(r, 0);
+          ctx.lineTo(0, r);
+          ctx.lineTo(-r, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = "rgba(255,255,255,0.85)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.strokeStyle = "rgba(255,255,255,0.5)";
+          ctx.beginPath();
+          ctx.moveTo(0, -r); ctx.lineTo(0, r);
+          ctx.moveTo(-r, 0); ctx.lineTo(r, 0);
+          ctx.stroke();
+          // shifting highlight
+          const hx2 = -r * 0.35 + Math.cos(tNow / 600 + phase) * r * 0.15;
+          const hy2 = -r * 0.35 + Math.sin(tNow / 600 + phase) * r * 0.15;
+          ctx.fillStyle = "rgba(255,255,255,0.95)";
+          ctx.beginPath();
+          ctx.arc(hx2, hy2, 1.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          // twinkle sparks orbiting higher-rarity loot
+          if (l.rarity !== "common") {
+            const sparks = l.rarity === "epic" ? 4 : l.rarity === "rare" ? 3 : 2;
+            for (let i = 0; i < sparks; i++) {
+              const ang = tNow / 700 + phase + (i / sparks) * Math.PI * 2;
+              const orbit = baseR + 5 + Math.sin(tNow / 300 + i) * 1.6;
+              const sx = cx + Math.cos(ang) * orbit;
+              const sy = cy + Math.sin(ang) * orbit;
+              const sa = 0.5 + 0.5 * Math.sin(tNow / 200 + i * 1.7);
+              ctx.fillStyle = `rgba(255,255,255,${0.7 * sa})`;
+              ctx.beginPath();
+              ctx.arc(sx, sy, 1.1, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
         }
-        // crystal body
-        ctx.fillStyle = l.color;
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - r);
-        ctx.lineTo(cx + r, cy);
-        ctx.lineTo(cx, cy + r);
-        ctx.lineTo(cx - r, cy);
-        ctx.closePath();
-        ctx.fill();
-        // facet outline
-        ctx.strokeStyle = "rgba(255,255,255,0.85)";
-        ctx.lineWidth = 1;
-        ctx.stroke();
-        // inner facet lines
-        ctx.strokeStyle = "rgba(255,255,255,0.5)";
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-        ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
-        ctx.stroke();
-        // highlight dot
-        ctx.fillStyle = "rgba(255,255,255,0.9)";
-        ctx.fillRect(cx - r / 2, cy - r / 2, 1.5, 1.5);
       }
 
       // ---- Obstacles: asteroids ----
