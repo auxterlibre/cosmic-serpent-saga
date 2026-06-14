@@ -1194,21 +1194,24 @@ function Game() {
           ctx.arc(cx, cy, glowR, 0, Math.PI * 2);
           ctx.fill();
           ctx.globalAlpha = 1;
-          // outer halo ring for higher rarity
+          // outer halo diamond for higher rarity
           if (l.rarity !== "common") {
             ctx.strokeStyle = l.color;
             ctx.globalAlpha = (l.rarity === "epic" ? 0.55 : 0.35) * (0.6 + 0.4 * pulse);
             ctx.lineWidth = l.rarity === "epic" ? 2 : 1;
+            const hr = baseR + 4;
             ctx.beginPath();
-            ctx.arc(cx, cy, baseR + 4, 0, Math.PI * 2);
+            ctx.moveTo(cx, cy - hr);
+            ctx.lineTo(cx + hr, cy);
+            ctx.lineTo(cx, cy + hr);
+            ctx.lineTo(cx - hr, cy);
+            ctx.closePath();
             ctx.stroke();
             ctx.globalAlpha = 1;
           }
-          // crystal body (gently rotating diamond)
-          const rot = (tNow / 1800 + phase) % (Math.PI * 2);
+          // crystal body (static diamond — no rotation for visual consistency)
           ctx.save();
           ctx.translate(cx, cy);
-          ctx.rotate(rot * (l.rarity === "common" ? 0 : 0.25));
           ctx.fillStyle = l.color;
           ctx.beginPath();
           ctx.moveTo(0, -r);
