@@ -538,6 +538,7 @@ function Game() {
     spendSegments(cost);
     for (let i = 0; i < BREAKDOWN_YIELD; i++) s.growth.push(RARITY_INFO[to].color);
     syncHud();
+    flashRes([from, to]);
   }
 
 
