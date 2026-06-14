@@ -74,7 +74,7 @@ function pickRarity(boost = 0): Rarity {
 }
 function makeLootItem(boost = 0, awayFrom?: Vec): Colored {
   const r = pickRarity(boost);
-  return { ...randPosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
+  return { ...randPlayablePosAway(awayFrom), color: RARITY_INFO[r].color, rarity: r };
 }
 
 function rand(n: number) { return Math.floor(Math.random() * n); }
@@ -90,6 +90,24 @@ function randPosAway(from?: Vec, minDist = SPAWN_MIN_DIST): Vec {
     if (dx * dx + dy * dy >= minDist * minDist) return p;
   }
   return randPos();
+}
+
+function isInsidePlayableArea(p: Vec, pad = 3): boolean {
+  const dx = Math.min(p.x, WORLD_W - p.x);
+  const dy = Math.min(p.y, WORLD_H - p.y);
+  const inner = beltInnerEdge(p.x, p.y) + pad;
+  return dx > inner && dy > inner;
+}
+
+function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3): Vec {
+  for (let i = 0; i < 180; i++) {
+    const p = randPos();
+    if (!isInsidePlayableArea(p, pad)) continue;
+    if (!from) return p;
+    const dx = p.x - from.x, dy = p.y - from.y;
+    if (dx * dx + dy * dy >= minDist * minDist) return p;
+  }
+  return { x: WORLD_W / 2 + rand(17) - 8, y: WORLD_H / 2 + rand(17) - 8 };
 }
 
 // Player starts as just the head — no trailing segments.
