@@ -1201,8 +1201,9 @@ function Game() {
         const head = s.snake[0];
         // Wardens only engage when the player is on (or very near) the screen.
         // Use the rendered viewport in world cells to decide visibility.
-        const visW = (c?.width ?? 800) / 1.3 / CELL;
-        const visH = (c?.height ?? 800) / 1.3 / CELL;
+        const vc = canvasRef.current;
+        const visW = (vc?.width ?? 800) / 1.3 / CELL;
+        const visH = (vc?.height ?? 800) / 1.3 / CELL;
         const VISIBLE_RANGE = Math.max(visW, visH) * 0.55; // half-diagonal-ish
         for (const w of s.wardens) {
           if (w.cooldown > 0) w.cooldown = Math.max(0, w.cooldown - dt);
