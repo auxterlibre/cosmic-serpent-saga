@@ -20,7 +20,9 @@ const TURN_RATE = 8.5;
 const SEG_SPACING = 0.85;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
-const HUNTER_COUNT = 8;
+const HUNTER_MIN = 1;
+const HUNTER_MAX = 10;
+const HUNTER_PER_LOOT = 1 / 3; // +1 hunter per 3 loot segments carried
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
@@ -29,7 +31,7 @@ type Vec = { x: number; y: number };
 type Colored = { x: number; y: number; color: string; rarity: Rarity };
 
 type Obstacle = { x: number; y: number; size: number };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null; wanderTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string; overCapUntil?: number };
@@ -184,7 +186,7 @@ function makeObstacles(): Obstacle[] {
   return list;
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
+  return Array.from({ length: HUNTER_MIN }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null }));
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -718,6 +720,29 @@ function Game() {
         const dtSec = dt / 1000;
         const step = HUNTER_SPEED * dtSec;
 
+        // Scale hunter count with loot carried (excluding the head/ship segment).
+        const loot = Math.max(0, s.snake.length - 1);
+        const desired = Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, HUNTER_MIN + Math.floor(loot * HUNTER_PER_LOOT)));
+        const activeCount = s.hunters.filter((h) => !h.fleeing).length;
+        if (activeCount < desired) {
+          for (let i = 0; i < desired - activeCount; i++) {
+            s.hunters.push({ ...randPosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+          }
+        } else if (activeCount > desired) {
+          let toRemove = activeCount - desired;
+          for (let i = s.hunters.length - 1; i >= 0 && toRemove > 0; i--) {
+            const h = s.hunters[i];
+            if (!h.fleeing && h.stolen.length === 0) {
+              // Send them off-screen so they despawn naturally.
+              h.fleeing = true;
+              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
+              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
+              h.fleeTarget = { x: ex, y: ey };
+              toRemove--;
+            }
+          }
+        }
+
         // Separation pass: push hunters apart so they don't stack on top of each other.
         const SEP_DIST = 1.6;
         const SEP_DIST2 = SEP_DIST * SEP_DIST;
@@ -763,7 +788,15 @@ function Game() {
             }
             tx = h.fleeTarget.x + 0.5;
             ty = h.fleeTarget.y + 0.5;
+          } else if (loot <= 0) {
+            // No loot to steal — wander instead of hunting the player.
+            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+            }
+            tx = h.wanderTarget.x;
+            ty = h.wanderTarget.y;
           } else {
+            h.wanderTarget = null;
             let bestD = Infinity;
             let bx = 0, by = 0;
             for (let i = 0; i < s.snake.length; i++) {
@@ -813,13 +846,13 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
               }
             }
             continue;
           }
 
-          if (h.cooldown <= 0) {
+          if (h.cooldown <= 0 && loot > 0) {
             const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
             const reach = (hsize + 0.4) * (hsize + 0.4);
             let hitIdx = -1;
@@ -835,7 +868,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
               }
               syncHud();
               continue;
@@ -940,7 +973,7 @@ function Game() {
                   });
                 }
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null });
+                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
                 syncHud();
               }
               return false;
