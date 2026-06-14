@@ -474,6 +474,7 @@ function Game() {
     apply();
     s[lvlKey] += 1;
     syncHud();
+    flashRes((Object.keys(cost) as Rarity[]).filter((k) => cost[k] > 0));
   }
 
 
