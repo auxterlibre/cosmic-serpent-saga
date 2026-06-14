@@ -222,34 +222,8 @@ function makeHunters(): Hunter[] {
   return [];
 }
 function makeCheckpoints(): Checkpoint[] {
-  const cps: Checkpoint[] = [];
-  // Aim for generous spacing; relax gradually if we can't place them.
-  let minDist = Math.min(WORLD_W, WORLD_H) * 0.42;
-  // Keep checkpoints clear of the asteroid belt (and a bit of breathing room).
-  let beltPad = 8;
-  let attempts = 0;
-  while (cps.length < CHECKPOINT_COUNT) {
-    attempts++;
-    const c = { x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) };
-    const dx = Math.min(c.x, WORLD_W - c.x);
-    const dy = Math.min(c.y, WORLD_H - c.y);
-    const inner = beltInnerEdge(c.x, c.y);
-    if (dx < inner + beltPad || dy < inner + beltPad) {
-      if (attempts > 4000) beltPad = Math.max(2, beltPad - 1);
-      continue;
-    }
-    if (!clearOfObstacles(c, 3)) {
-      if (attempts > 4000) { /* keep trying with reduced belt pad */ }
-      continue;
-    }
-    const md2 = minDist * minDist;
-    if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md2)) {
-      cps.push(c);
-    }
-    if (attempts % 500 === 0) minDist *= 0.9;
-    if (attempts > 8000) break;
-  }
-  return cps;
+  // A single checkpoint at the center of the map.
+  return [{ x: WORLD_W / 2, y: WORLD_H / 2 }];
 }
 
 function initialSnake(): Seg[] {
