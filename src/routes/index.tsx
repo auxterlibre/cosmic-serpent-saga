@@ -1065,7 +1065,7 @@ function Game() {
       const viewH = c.height;
 
       const portrait = viewH > viewW;
-      const zoom = portrait ? Math.min(1, Math.max(0.45, viewW / 800)) : 1;
+      const zoom = (portrait ? Math.min(1, Math.max(0.45, viewW / 800)) : 1) * 1.3;
       const wViewW = viewW / zoom;
       const wViewH = viewH / zoom;
 
