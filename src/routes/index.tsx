@@ -995,7 +995,17 @@ function Game() {
               const head = s.snake[0];
               const now = performance.now();
               s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: now });
-              if (head) s.explosions.push({ x: head.x, y: head.y, t0: now + 60 });
+              if (head) s.explosions.push({ x: head.x, y: head.y, t0: now + 80 });
+              // Chain-detonate the cargo train from head to tail.
+              for (let k = 1; k < s.snake.length; k++) {
+                const seg = s.snake[k];
+                s.explosions.push({
+                  x: seg.x + (Math.random() - 0.5) * 0.4,
+                  y: seg.y + (Math.random() - 0.5) * 0.4,
+                  t0: now + 80 + k * 90,
+                });
+              }
+              s.snake = [];
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
               s.alive = false;
