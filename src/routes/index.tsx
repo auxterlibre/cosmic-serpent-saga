@@ -889,7 +889,7 @@ function Game() {
 
         // Scale hunter count with loot carried (excluding the head/ship segment).
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = loot <= 0 ? 0 : Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, Math.ceil(loot * HUNTER_PER_LOOT)));
+        const desired = Math.min(HUNTER_MAX, 5 + Math.ceil(loot * HUNTER_PER_LOOT));
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
@@ -1191,7 +1191,7 @@ function Game() {
       // ---- Wardens: slow heavy turret ships that shoot the player ----
       {
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = loot >= 12 ? 2 : loot >= 4 ? 1 : 0;
+        const desired = loot >= 12 ? 4 : loot >= 4 ? 3 : 2;
         if (s.wardens.length < desired) {
           for (let i = 0; i < desired - s.wardens.length; i++) {
             const pos = randPlayablePosAway(s.snake[0] ?? START);
