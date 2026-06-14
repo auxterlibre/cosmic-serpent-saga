@@ -1136,10 +1136,10 @@ function Game() {
           const a = (i / arms) * Math.PI * 2;
           const ax = Math.cos(a);
           const ay = Math.sin(a);
-          const armLen = r + 6 + ((seed >> (i * 2)) & 0x7);
+          const armLen = r + 10 + ((seed >> (i * 2)) & 0xb);
           // truss strut
-          ctx.strokeStyle = "#9ca3af";
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = "#7a7d85";
+          ctx.lineWidth = 1.3;
           ctx.beginPath();
           ctx.moveTo(ax * (r - 1), ay * (r - 1));
           ctx.lineTo(ax * armLen, ay * armLen);
