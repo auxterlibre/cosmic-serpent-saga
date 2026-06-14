@@ -1129,17 +1129,33 @@ function Game() {
         ctx.restore();
       }
 
-      // ---- Projectiles: glowing tracers ----
+      // ---- Projectiles: bright tracer rounds with motion trail ----
       for (const p of s.projectiles) {
         const px = p.x * CELL - camX;
         const py = p.y * CELL - camY;
-        ctx.fillStyle = "rgba(253, 224, 71, 0.35)";
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        const tx = px - (p.vx / sp) * CELL * 0.9;
+        const ty = py - (p.vy / sp) * CELL * 0.9;
+        // Outer glow
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, 14);
+        glow.addColorStop(0, "rgba(255, 240, 120, 0.7)");
+        glow.addColorStop(1, "rgba(255, 200, 0, 0)");
+        ctx.fillStyle = glow;
         ctx.beginPath();
-        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
         ctx.fill();
-        ctx.fillStyle = "#fef9c3";
+        // Tracer streak
+        ctx.strokeStyle = "rgba(255, 235, 130, 0.9)";
+        ctx.lineWidth = 3;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        // Bright core
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(px, py, 2.6, 0, Math.PI * 2);
         ctx.fill();
       }
 
