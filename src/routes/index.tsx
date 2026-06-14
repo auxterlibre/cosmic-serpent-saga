@@ -1270,8 +1270,12 @@ function Game() {
 
         // $ tag floating just above the hub (un-rotated for readability)
         ctx.fillStyle = "#fde68a";
-        ctx.font = "bold 9px monospace";
-        ctx.fillText("$", cx - 2.5, cy + 3.5);
+        ctx.font = "bold 16px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("$", cx, cy + 0.5);
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
       }
 
       // ---- Loot: crystal shards with VFX ----
