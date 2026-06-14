@@ -593,7 +593,7 @@ function Game() {
     const s = stateRef.current;
     const inv = computeInventory(s.snake, s.growth);
     if (inv[from] < CRAFT_COST) return;
-    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const cost: Cost = emptyCost();
     cost[from] = CRAFT_COST;
     spendSegments(cost);
     s.growth.push(RARITY_INFO[to].color);
