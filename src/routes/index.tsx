@@ -771,6 +771,16 @@ function Game() {
           s.explosions.push({ x: hx, y: hy, t0: now });
           s.explosions.push({ x: cx, y: cy, t0: now + 80 });
           s.explosions.push({ x: cx + (Math.random() - 0.5) * size * 0.4, y: cy + (Math.random() - 0.5) * size * 0.4, t0: now + 200 });
+          // Blow up every cargo segment in sequence from head to tail, then clear the train.
+          for (let k = 1; k < s.snake.length; k++) {
+            const seg = s.snake[k];
+            s.explosions.push({
+              x: seg.x + (Math.random() - 0.5) * 0.4,
+              y: seg.y + (Math.random() - 0.5) * 0.4,
+              t0: now + 40 + k * 90,
+            });
+          }
+          s.snake = [];
           // Shatter the asteroid into debris chunks.
           const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
           const tintRoll = (seed % 1000) / 1000;
