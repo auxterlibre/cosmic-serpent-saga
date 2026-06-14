@@ -1191,7 +1191,7 @@ function Game() {
       // ---- Wardens: slow heavy turret ships that shoot the player ----
       {
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = loot >= 12 ? 14 : loot >= 4 ? 11 : 8;
+        const desired = loot >= 12 ? 7 : loot >= 4 ? 5 : 4;
         if (s.wardens.length < desired) {
           for (let i = 0; i < desired - s.wardens.length; i++) {
             const pos = randPlayablePosAway(s.snake[0] ?? START);
@@ -1199,33 +1199,40 @@ function Game() {
           }
         }
         const head = s.snake[0];
+        // Wardens only engage when the player is on (or very near) the screen.
+        // Use the rendered viewport in world cells to decide visibility.
+        const visW = (c?.width ?? 800) / 1.3 / CELL;
+        const visH = (c?.height ?? 800) / 1.3 / CELL;
+        const VISIBLE_RANGE = Math.max(visW, visH) * 0.55; // half-diagonal-ish
         for (const w of s.wardens) {
           if (w.cooldown > 0) w.cooldown = Math.max(0, w.cooldown - dt);
           if (!head) continue;
           const dx = head.x - (w.x + 0.5);
           const dy = head.y - (w.y + 0.5);
           const dist = Math.hypot(dx, dy) || 0.0001;
-          // Maintain a standoff distance from the player.
+          const engaged = dist < VISIBLE_RANGE;
           const step = WARDEN_SPEED * dtSec;
-          if (dist > WARDEN_PREFERRED_DIST + 0.5) {
-            const move = Math.min(step, dist - WARDEN_PREFERRED_DIST);
-            w.x += (dx / dist) * move;
-            w.y += (dy / dist) * move;
-          } else if (dist < WARDEN_PREFERRED_DIST - 1.5) {
-            const move = Math.min(step * 0.7, WARDEN_PREFERRED_DIST - dist);
-            w.x -= (dx / dist) * move;
-            w.y -= (dy / dist) * move;
+          if (engaged) {
+            // Chase to standoff distance only while in view.
+            if (dist > WARDEN_PREFERRED_DIST + 0.5) {
+              const move = Math.min(step, dist - WARDEN_PREFERRED_DIST);
+              w.x += (dx / dist) * move;
+              w.y += (dy / dist) * move;
+            } else if (dist < WARDEN_PREFERRED_DIST - 1.5) {
+              const move = Math.min(step * 0.7, WARDEN_PREFERRED_DIST - dist);
+              w.x -= (dx / dist) * move;
+              w.y -= (dy / dist) * move;
+            }
           }
           w.x = Math.max(1, Math.min(WORLD_W - 2, w.x));
           w.y = Math.max(1, Math.min(WORLD_H - 2, w.y));
-          // Aim with smoothed rotation.
+          // Aim toward player even when idle so they look alert; fire only when engaged.
           const targetAng = Math.atan2(dy, dx);
           let diffA = targetAng - w.angle;
           while (diffA > Math.PI) diffA -= Math.PI * 2;
           while (diffA < -Math.PI) diffA += Math.PI * 2;
-          w.angle += diffA * Math.min(1, dtSec * 3.2);
-          if (w.cooldown <= 0 && dist < WARDEN_FIRE_RANGE) {
-            // Light lead targeting; player can still dodge by changing course.
+          w.angle += diffA * Math.min(1, dtSec * (engaged ? 3.2 : 1.2));
+          if (engaged && w.cooldown <= 0 && dist < WARDEN_FIRE_RANGE) {
             const vxH = Math.cos(s.headAngle) * s.playerSpeed;
             const vyH = Math.sin(s.headAngle) * s.playerSpeed;
             const tflight = dist / WARDEN_SHOT_SPEED;
