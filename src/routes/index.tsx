@@ -1124,7 +1124,7 @@ function Game() {
         // deterministic per-station seed so each looks unique but stable
         const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
         const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
-        const r = CELL * 0.42;
+        const r = CELL * 0.7;
 
         ctx.save();
         ctx.translate(cx, cy);
@@ -1136,23 +1136,23 @@ function Game() {
           const a = (i / arms) * Math.PI * 2;
           const ax = Math.cos(a);
           const ay = Math.sin(a);
-          const armLen = r + 6 + ((seed >> (i * 2)) & 0x7);
+          const armLen = r + 10 + ((seed >> (i * 2)) & 0xb);
           // truss strut
-          ctx.strokeStyle = "#9ca3af";
-          ctx.lineWidth = 1;
+          ctx.strokeStyle = "#7a7d85";
+          ctx.lineWidth = 1.3;
           ctx.beginPath();
           ctx.moveTo(ax * (r - 1), ay * (r - 1));
           ctx.lineTo(ax * armLen, ay * armLen);
           ctx.stroke();
           // cross-hatch ribs
-          ctx.strokeStyle = "rgba(156,163,175,0.55)";
+          ctx.strokeStyle = "rgba(122,125,133,0.55)";
           for (let k = 1; k < 3; k++) {
             const t = k / 3;
             const mx = ax * (r + (armLen - r) * t);
             const my = ay * (r + (armLen - r) * t);
             ctx.beginPath();
-            ctx.moveTo(mx - ay * 2, my + ax * 2);
-            ctx.lineTo(mx + ay * 2, my - ax * 2);
+            ctx.moveTo(mx - ay * 3, my + ax * 3);
+            ctx.lineTo(mx + ay * 3, my - ax * 3);
             ctx.stroke();
           }
           // module at the end — alternating tank / solar panel / antenna
@@ -1160,54 +1160,54 @@ function Game() {
           const ex = ax * (armLen + 3);
           const ey = ay * (armLen + 3);
           if (mod === 0) {
-            // rusty fuel tank
-            ctx.fillStyle = "#7c5a3a";
-            ctx.strokeStyle = "#3f2a1a";
+            // weathered fuel tank
+            ctx.fillStyle = "#4a4640";
+            ctx.strokeStyle = "#2a2622";
             ctx.lineWidth = 1;
             ctx.beginPath();
-            ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
+            ctx.arc(ex, ey, 5, 0, Math.PI * 2);
             ctx.fill();
             ctx.stroke();
-            ctx.fillStyle = "rgba(0,0,0,0.35)";
-            ctx.fillRect(ex - 3.5, ey - 0.5, 7, 1);
+            ctx.fillStyle = "rgba(0,0,0,0.4)";
+            ctx.fillRect(ex - 5, ey - 0.5, 10, 1);
           } else if (mod === 1) {
-            // solar panel (perpendicular plate)
+            // solar panel (perpendicular plate) — muted grey-blue
             ctx.save();
             ctx.translate(ex, ey);
             ctx.rotate(a + Math.PI / 2);
-            ctx.fillStyle = "#1e3a8a";
-            ctx.fillRect(-5, -1.5, 10, 3);
-            ctx.strokeStyle = "#60a5fa";
+            ctx.fillStyle = "#2d343f";
+            ctx.fillRect(-8, -2, 16, 4);
+            ctx.strokeStyle = "#4a5260";
             ctx.lineWidth = 0.5;
-            for (let g = -4; g <= 4; g += 2) {
+            for (let g = -6; g <= 6; g += 2) {
               ctx.beginPath();
-              ctx.moveTo(g, -1.5);
-              ctx.lineTo(g, 1.5);
+              ctx.moveTo(g, -2);
+              ctx.lineTo(g, 2);
               ctx.stroke();
             }
-            ctx.strokeStyle = "#1e293b";
-            ctx.strokeRect(-5, -1.5, 10, 3);
+            ctx.strokeStyle = "#1a1d24";
+            ctx.strokeRect(-8, -2, 16, 4);
             ctx.restore();
           } else {
             // antenna with blinking tip
-            ctx.strokeStyle = "#cbd5e1";
-            ctx.lineWidth = 0.8;
+            ctx.strokeStyle = "#b4b7bd";
+            ctx.lineWidth = 0.9;
             ctx.beginPath();
             ctx.moveTo(ex, ey);
-            ctx.lineTo(ex + ax * 4, ey + ay * 4);
+            ctx.lineTo(ex + ax * 6, ey + ay * 6);
             ctx.stroke();
             const blink = (Math.sin(tStation / 220 + i) + 1) / 2;
-            ctx.fillStyle = `rgba(239,68,68,${0.4 + blink * 0.6})`;
+            ctx.fillStyle = `rgba(220,90,70,${0.35 + blink * 0.55})`;
             ctx.beginPath();
-            ctx.arc(ex + ax * 4, ey + ay * 4, 1.4, 0, Math.PI * 2);
+            ctx.arc(ex + ax * 6, ey + ay * 6, 1.6, 0, Math.PI * 2);
             ctx.fill();
           }
         }
 
         // ---- main hub: irregular, riveted plating ----
-        ctx.fillStyle = "#2b2f3a";
-        ctx.strokeStyle = "#9ca3af";
-        ctx.lineWidth = 1.2;
+        ctx.fillStyle = "#34373f";
+        ctx.strokeStyle = "#7a7d85";
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
         const sides = 7;
         for (let i = 0; i < sides; i++) {
@@ -1222,32 +1222,32 @@ function Game() {
         ctx.stroke();
 
         // patchwork plating seams
-        ctx.strokeStyle = "rgba(156,163,175,0.35)";
-        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = "rgba(140,143,150,0.35)";
+        ctx.lineWidth = 0.7;
         ctx.beginPath();
         ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(r * 0.5, -r * 0.1);
         ctx.moveTo(-r * 0.1, -r * 0.7); ctx.lineTo(0, r * 0.6);
         ctx.stroke();
 
         // tiny rivets
-        ctx.fillStyle = "#6b7280";
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * Math.PI * 2 + 0.3;
-          ctx.fillRect(Math.cos(a) * r * 0.78 - 0.5, Math.sin(a) * r * 0.78 - 0.5, 1, 1);
+        ctx.fillStyle = "#5a5d65";
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + 0.3;
+          ctx.fillRect(Math.cos(a) * r * 0.8 - 0.6, Math.sin(a) * r * 0.8 - 0.6, 1.2, 1.2);
         }
 
-        // grimy viewport with warm interior glow
+        // grimy viewport with faint warm interior glow
         const lit = (Math.sin(stationPulse) + 1) / 2;
-        const vpR = r * 0.34;
+        const vpR = r * 0.32;
         const vpGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, vpR);
-        vpGrd.addColorStop(0, `rgba(253,224,71,${0.85 + lit * 0.15})`);
-        vpGrd.addColorStop(0.6, "rgba(217,119,6,0.7)");
-        vpGrd.addColorStop(1, "rgba(120,53,15,0.2)");
+        vpGrd.addColorStop(0, `rgba(230,200,140,${0.7 + lit * 0.2})`);
+        vpGrd.addColorStop(0.7, "rgba(120,95,60,0.45)");
+        vpGrd.addColorStop(1, "rgba(40,32,22,0.15)");
         ctx.fillStyle = vpGrd;
         ctx.beginPath();
         ctx.arc(0, 0, vpR, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#fbbf24";
+        ctx.strokeStyle = "rgba(180,150,100,0.8)";
         ctx.lineWidth = 0.8;
         ctx.stroke();
 
