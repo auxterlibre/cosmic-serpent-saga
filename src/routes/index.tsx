@@ -632,6 +632,40 @@ function Game() {
       {
         const dtSec = dt / 1000;
         const step = HUNTER_SPEED * dtSec;
+
+        // Separation pass: push hunters apart so they don't stack on top of each other.
+        const SEP_DIST = 1.6;
+        const SEP_DIST2 = SEP_DIST * SEP_DIST;
+        for (let i = 0; i < s.hunters.length; i++) {
+          const a = s.hunters[i];
+          for (let j = i + 1; j < s.hunters.length; j++) {
+            const b = s.hunters[j];
+            const dx = b.x - a.x;
+            const dy = b.y - a.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < SEP_DIST2 && d2 > 0.0001) {
+              const d = Math.sqrt(d2);
+              const overlap = (SEP_DIST - d) * 0.5;
+              const nx = dx / d;
+              const ny = dy / d;
+              a.x -= nx * overlap;
+              a.y -= ny * overlap;
+              b.x += nx * overlap;
+              b.y += ny * overlap;
+            } else if (d2 <= 0.0001) {
+              // Exactly overlapping — nudge apart in a random direction.
+              const ang = Math.random() * Math.PI * 2;
+              a.x -= Math.cos(ang) * SEP_DIST * 0.5;
+              a.y -= Math.sin(ang) * SEP_DIST * 0.5;
+              b.x += Math.cos(ang) * SEP_DIST * 0.5;
+              b.y += Math.sin(ang) * SEP_DIST * 0.5;
+            }
+          }
+          // Keep inside world bounds after separation.
+          a.x = Math.max(0, Math.min(WORLD_W - 1, a.x));
+          a.y = Math.max(0, Math.min(WORLD_H - 1, a.y));
+        }
+
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
 
