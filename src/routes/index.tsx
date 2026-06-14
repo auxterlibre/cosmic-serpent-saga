@@ -17,7 +17,7 @@ const WORLD_W = 150;
 const WORLD_H = 150;
 const BASE_PLAYER_SPEED = 8.5; // cells per second
 const TURN_RATE = 8.5;
-const SEG_SPACING = 0.85;
+const SEG_SPACING = 1.15;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
 const HUNTER_MIN = 1;
@@ -35,6 +35,7 @@ type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: numbe
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string; overCapUntil?: number };
+type Explosion = { x: number; y: number; t0: number };
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
@@ -192,16 +193,25 @@ function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
   // Aim for generous spacing; relax gradually if we can't place them.
   let minDist = Math.min(WORLD_W, WORLD_H) * 0.42;
+  // Keep checkpoints clear of the asteroid belt (and a bit of breathing room).
+  let beltPad = 8;
   let attempts = 0;
   while (cps.length < CHECKPOINT_COUNT) {
     attempts++;
     const c = { x: 10 + rand(WORLD_W - 20), y: 10 + rand(WORLD_H - 20) };
+    const dx = Math.min(c.x, WORLD_W - c.x);
+    const dy = Math.min(c.y, WORLD_H - c.y);
+    const inner = beltInnerEdge(c.x, c.y);
+    if (dx < inner + beltPad || dy < inner + beltPad) {
+      if (attempts > 4000) beltPad = Math.max(2, beltPad - 1);
+      continue;
+    }
     const md2 = minDist * minDist;
     if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md2)) {
       cps.push(c);
     }
     if (attempts % 500 === 0) minDist *= 0.9;
-    if (attempts > 5000) break;
+    if (attempts > 8000) break;
   }
   return cps;
 }
@@ -256,6 +266,7 @@ function initialState() {
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
+    explosions: [] as Explosion[],
     alive: true,
     score: 0,
     scrap: 0,
@@ -959,6 +970,7 @@ function Game() {
               h.hp -= s.damage;
               if (h.hp <= 0) {
                 s.score += 15;
+                s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
                 // Hunters drop scrap parts on death.
                 s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
                 // If they were carrying stolen segments, scatter them as loot.
@@ -1281,6 +1293,50 @@ function Game() {
         ctx.beginPath();
         ctx.arc(px, py, 2.6, 0, Math.PI * 2);
         ctx.fill();
+      }
+
+      // ---- Explosions: expanding shockwave + flash + sparks ----
+      {
+        const nowE = performance.now();
+        const DUR = 520;
+        s.explosions = s.explosions.filter((e) => nowE - e.t0 < DUR);
+        for (const e of s.explosions) {
+          const t = (nowE - e.t0) / DUR; // 0..1
+          const ex = e.x * CELL - camX;
+          const ey = e.y * CELL - camY;
+          if (ex < -60 || ey < -60 || ex > wViewW + 60 || ey > wViewH + 60) continue;
+          const maxR = CELL * 1.6;
+          const r = maxR * (0.25 + t * 1.05);
+          // shockwave ring
+          ctx.strokeStyle = `rgba(255, 200, 80, ${1 - t})`;
+          ctx.lineWidth = 2 * (1 - t) + 0.5;
+          ctx.beginPath();
+          ctx.arc(ex, ey, r, 0, Math.PI * 2);
+          ctx.stroke();
+          // bright flash core (fast falloff)
+          const coreA = Math.max(0, 1 - t * 2.2);
+          if (coreA > 0) {
+            const grd = ctx.createRadialGradient(ex, ey, 0, ex, ey, CELL * 1.1);
+            grd.addColorStop(0, `rgba(255, 255, 230, ${0.95 * coreA})`);
+            grd.addColorStop(0.4, `rgba(255, 170, 60, ${0.55 * coreA})`);
+            grd.addColorStop(1, "rgba(255, 80, 0, 0)");
+            ctx.fillStyle = grd;
+            ctx.beginPath();
+            ctx.arc(ex, ey, CELL * 1.1, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          // deterministic sparks
+          const seed = (Math.floor(e.t0) * 2654435761) >>> 0;
+          const sparks = 8;
+          for (let i = 0; i < sparks; i++) {
+            const a = ((seed * (i + 1) * 16807) >>> 0) % 1000 / 1000 * Math.PI * 2;
+            const sp = CELL * (1.0 + ((seed * (i + 5) * 48271) >>> 0) % 1000 / 1000 * 1.4);
+            const sx = ex + Math.cos(a) * sp * t;
+            const sy = ey + Math.sin(a) * sp * t;
+            ctx.fillStyle = `rgba(255, ${180 + (i * 17) % 70}, 80, ${1 - t})`;
+            ctx.fillRect(sx - 1, sy - 1, 2, 2);
+          }
+        }
       }
 
       const R = CELL * 0.45;
