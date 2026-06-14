@@ -25,6 +25,13 @@ const HUNTER_MAX = 20;
 const HUNTER_PER_LOOT = 2 / 3; // +1 hunter per 1.5 loot segments carried
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
+// Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
+const WARDEN_SPEED = 2.0;
+const WARDEN_HP = 8;
+const WARDEN_FIRE_INTERVAL = 2200;
+const WARDEN_SHOT_SPEED = 16; // slower than player's 45 so shots can be dodged
+const WARDEN_PREFERRED_DIST = 12;
+const WARDEN_FIRE_RANGE = 26;
 
 type Rarity = "common" | "uncommon" | "rare" | "epic";
 type Vec = { x: number; y: number };
@@ -32,7 +39,9 @@ type Colored = { x: number; y: number; color: string; rarity: Rarity };
 
 type Obstacle = { x: number; y: number; size: number };
 type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null; wanderTarget: Vec | null };
+type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
+type WardenShot = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 type Explosion = { x: number; y: number; t0: number };
@@ -139,8 +148,34 @@ const OVER_CAP_MS = 5000;
 // Player spawns near (but not on top of) the central checkpoint.
 const START: Vec = { x: WORLD_W / 2 + 6, y: WORLD_H / 2 + 4 };
 
-function makeLoot(): Colored[] {
+function makeStarterLoot(): Colored[] {
+  // Seed a few common loot near the central checkpoint so the player has
+  // immediate pickups within sight of spawn.
+  const center = { x: WORLD_W / 2, y: WORLD_H / 2 };
   const out: Colored[] = [];
+  const target = 6;
+  for (let n = 0; n < target; n++) {
+    for (let tries = 0; tries < 80; tries++) {
+      const a = Math.random() * Math.PI * 2;
+      const r = 4.5 + Math.random() * 6;
+      const p = { x: center.x + Math.cos(a) * r, y: center.y + Math.sin(a) * r };
+      if (!isInsidePlayableArea(p, 2.5)) continue;
+      if (!clearOfObstacles(p, 1.6)) continue;
+      let ok = true;
+      for (const q of out) {
+        const dx = p.x - q.x, dy = p.y - q.y;
+        if (dx * dx + dy * dy < LOOT_MIN_SPACING * LOOT_MIN_SPACING) { ok = false; break; }
+      }
+      if (!ok) continue;
+      out.push({ x: p.x, y: p.y, color: RARITY_INFO.common.color, rarity: "common" });
+      break;
+    }
+  }
+  return out;
+}
+
+function makeLoot(): Colored[] {
+  const out: Colored[] = makeStarterLoot();
   for (let i = 0; i < LOOT_COUNT; i++) out.push(makeLootItem(0, START, out));
   return out;
 }
@@ -306,9 +341,13 @@ function initialState() {
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
+    wardens: [] as Warden[],
+    wardenShots: [] as WardenShot[],
     explosions: [] as Explosion[],
     debris: [] as Debris[],
     pickups: [] as Pickup[],
+    lastHeadX: START.x,
+    lastHeadY: START.y,
     alive: true,
     score: 0,
     scrap: 0,
@@ -1118,10 +1157,144 @@ function Game() {
               return false;
             }
           }
+          // Player projectiles also damage wardens.
+          for (let i = 0; i < s.wardens.length; i++) {
+            const w = s.wardens[i];
+            const wr = 1.0;
+            const dx = p.x - (w.x + 0.5);
+            const dy = p.y - (w.y + 0.5);
+            if (dx * dx + dy * dy <= wr * wr) {
+              w.hp -= s.damage;
+              if (w.hp <= 0) {
+                s.score += 60;
+                const nowK = performance.now();
+                s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
+                s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
+                s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
+                s.scrap += 8 + Math.floor(Math.random() * 5);
+                s.wardens.splice(i, 1);
+                syncHud();
+              }
+              return false;
+            }
+          }
         }
         p.life -= dt;
         return p.life > 0;
       });
+
+      // ---- Wardens: slow heavy turret ships that shoot the player ----
+      {
+        const loot = Math.max(0, s.snake.length - 1);
+        const desired = loot >= 12 ? 2 : loot >= 4 ? 1 : 0;
+        if (s.wardens.length < desired) {
+          for (let i = 0; i < desired - s.wardens.length; i++) {
+            const pos = randPlayablePosAway(s.snake[0] ?? START);
+            s.wardens.push({ x: pos.x, y: pos.y, angle: 0, hp: WARDEN_HP, cooldown: 1500 });
+          }
+        }
+        const head = s.snake[0];
+        for (const w of s.wardens) {
+          if (w.cooldown > 0) w.cooldown = Math.max(0, w.cooldown - dt);
+          if (!head) continue;
+          const dx = head.x - (w.x + 0.5);
+          const dy = head.y - (w.y + 0.5);
+          const dist = Math.hypot(dx, dy) || 0.0001;
+          // Maintain a standoff distance from the player.
+          const step = WARDEN_SPEED * dtSec;
+          if (dist > WARDEN_PREFERRED_DIST + 0.5) {
+            const move = Math.min(step, dist - WARDEN_PREFERRED_DIST);
+            w.x += (dx / dist) * move;
+            w.y += (dy / dist) * move;
+          } else if (dist < WARDEN_PREFERRED_DIST - 1.5) {
+            const move = Math.min(step * 0.7, WARDEN_PREFERRED_DIST - dist);
+            w.x -= (dx / dist) * move;
+            w.y -= (dy / dist) * move;
+          }
+          w.x = Math.max(1, Math.min(WORLD_W - 2, w.x));
+          w.y = Math.max(1, Math.min(WORLD_H - 2, w.y));
+          // Aim with smoothed rotation.
+          const targetAng = Math.atan2(dy, dx);
+          let diffA = targetAng - w.angle;
+          while (diffA > Math.PI) diffA -= Math.PI * 2;
+          while (diffA < -Math.PI) diffA += Math.PI * 2;
+          w.angle += diffA * Math.min(1, dtSec * 3.2);
+          if (w.cooldown <= 0 && dist < WARDEN_FIRE_RANGE) {
+            // Light lead targeting; player can still dodge by changing course.
+            const vxH = Math.cos(s.headAngle) * s.playerSpeed;
+            const vyH = Math.sin(s.headAngle) * s.playerSpeed;
+            const tflight = dist / WARDEN_SHOT_SPEED;
+            const tx = head.x + vxH * tflight * 0.5;
+            const ty = head.y + vyH * tflight * 0.5;
+            const ddx = tx - (w.x + 0.5);
+            const ddy = ty - (w.y + 0.5);
+            const len = Math.hypot(ddx, ddy) || 1;
+            s.wardenShots.push({
+              x: w.x + 0.5,
+              y: w.y + 0.5,
+              vx: (ddx / len) * WARDEN_SHOT_SPEED,
+              vy: (ddy / len) * WARDEN_SHOT_SPEED,
+              life: 4000,
+            });
+            w.cooldown = WARDEN_FIRE_INTERVAL;
+          }
+        }
+
+        // Warden shots: travel slowly; on segment hit, destroy that segment
+        // and release every following segment as loot floating in space.
+        s.wardenShots = s.wardenShots.filter((p) => {
+          const steps = Math.max(1, Math.ceil((Math.hypot(p.vx, p.vy) * dtSec) / 0.3));
+          const stepDt = dtSec / steps;
+          for (let st = 0; st < steps; st++) {
+            p.x += p.vx * stepDt;
+            p.y += p.vy * stepDt;
+            if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
+            for (let i = 0; i < s.snake.length; i++) {
+              const seg = s.snake[i];
+              const dx = p.x - seg.x;
+              const dy = p.y - seg.y;
+              if (dx * dx + dy * dy <= 0.5 * 0.5) {
+                const now = performance.now();
+                if (i === 0) {
+                  // Direct hit on the ship: destroy everything.
+                  s.explosions.push({ x: seg.x, y: seg.y, t0: now });
+                  for (let k = 1; k < s.snake.length; k++) {
+                    const sg = s.snake[k];
+                    s.explosions.push({
+                      x: sg.x + (Math.random() - 0.5) * 0.4,
+                      y: sg.y + (Math.random() - 0.5) * 0.4,
+                      t0: now + 60 + k * 80,
+                    });
+                  }
+                  s.snake = [];
+                  s.alive = false;
+                  setTimeout(syncHud, 1500);
+                } else {
+                  // Cleave the train: the struck cargo is destroyed, the rest
+                  // is released back into space as collectible loot.
+                  const removed = s.snake.splice(i);
+                  s.explosions.push({ x: removed[0].x, y: removed[0].y, t0: now });
+                  for (let k = 1; k < removed.length; k++) {
+                    const sg = removed[k];
+                    let rar: Rarity = "common";
+                    for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === sg.color) { rar = r; break; }
+                    s.loot.push({
+                      x: Math.max(0.5, Math.min(WORLD_W - 0.5, sg.x + (Math.random() - 0.5) * 0.8)),
+                      y: Math.max(0.5, Math.min(WORLD_H - 0.5, sg.y + (Math.random() - 0.5) * 0.8)),
+                      color: sg.color,
+                      rarity: rar,
+                    });
+                  }
+                  syncHud();
+                }
+                return false;
+              }
+            }
+          }
+          p.life -= dt;
+          return p.life > 0;
+        });
+      }
     };
 
     const loop = (now: number) => {
@@ -1140,7 +1313,11 @@ function Game() {
       const ctx = c.getContext("2d");
       if (!ctx) return;
       const s = stateRef.current;
-      const head = s.snake[0] ?? { x: WORLD_W / 2, y: WORLD_H / 2 };
+      const liveHead = s.snake[0];
+      if (liveHead) { s.lastHeadX = liveHead.x; s.lastHeadY = liveHead.y; }
+      // Keep the camera anchored on the last known head position after death
+      // so the explosion stays on screen instead of snapping to world center.
+      const head = liveHead ?? { x: s.lastHeadX, y: s.lastHeadY };
 
       const viewW = c.width;
       const viewH = c.height;
@@ -1572,6 +1749,104 @@ function Game() {
         ctx.fill();
         ctx.restore();
       }
+
+      // ---- Wardens: heavy turret ships ----
+      for (const w of s.wardens) {
+        const cx = w.x * CELL + CELL / 2 - camX;
+        const cy = w.y * CELL + CELL / 2 - camY;
+        if (cx < -CELL * 6 || cy < -CELL * 6 || cx > wViewW + CELL * 6 || cy > wViewH + CELL * 6) continue;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(w.angle);
+        const R = CELL * 1.1;
+        // outer hull glow
+        const hullGlow = ctx.createRadialGradient(0, 0, R * 0.4, 0, 0, R * 1.6);
+        hullGlow.addColorStop(0, "rgba(180, 40, 40, 0.45)");
+        hullGlow.addColorStop(1, "rgba(180, 40, 40, 0)");
+        ctx.fillStyle = hullGlow;
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        // armored hull (hex-ish chunk)
+        ctx.fillStyle = "#4b1f1f";
+        ctx.strokeStyle = "#fca5a5";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(R, 0);
+        ctx.lineTo(R * 0.55, R * 0.85);
+        ctx.lineTo(-R * 0.7, R * 0.95);
+        ctx.lineTo(-R, 0);
+        ctx.lineTo(-R * 0.7, -R * 0.95);
+        ctx.lineTo(R * 0.55, -R * 0.85);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // armor plates
+        ctx.fillStyle = "#7f1d1d";
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        // central turret base
+        ctx.fillStyle = "#1f1f23";
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+        // cannon barrel
+        ctx.fillStyle = "#d1d5db";
+        ctx.strokeStyle = "#0a0a0a";
+        ctx.lineWidth = 1;
+        ctx.fillRect(0, -R * 0.16, R * 1.05, R * 0.32);
+        ctx.strokeRect(0, -R * 0.16, R * 1.05, R * 0.32);
+        // muzzle glow
+        const mg = ctx.createRadialGradient(R * 1.05, 0, 0, R * 1.05, 0, R * 0.5);
+        mg.addColorStop(0, "rgba(255, 120, 60, 0.7)");
+        mg.addColorStop(1, "rgba(255, 80, 0, 0)");
+        ctx.fillStyle = mg;
+        ctx.beginPath();
+        ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        // HP pip ring
+        ctx.restore();
+        const hpFrac = Math.max(0, w.hp / WARDEN_HP);
+        ctx.strokeStyle = "rgba(20,20,30,0.7)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpFrac);
+        ctx.stroke();
+      }
+
+      // ---- Warden shots: chunky orange plasma ----
+      for (const p of s.wardenShots) {
+        const px = p.x * CELL - camX;
+        const py = p.y * CELL - camY;
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        const tx = px - (p.vx / sp) * CELL * 1.1;
+        const ty = py - (p.vy / sp) * CELL * 1.1;
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, 18);
+        glow.addColorStop(0, "rgba(255, 140, 60, 0.85)");
+        glow.addColorStop(1, "rgba(255, 60, 0, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 150, 70, 0.95)";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        ctx.fillStyle = "#fff7ed";
+        ctx.beginPath();
+        ctx.arc(px, py, 3.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
 
       // ---- Projectiles: bright tracer rounds with motion trail ----
       for (const p of s.projectiles) {
