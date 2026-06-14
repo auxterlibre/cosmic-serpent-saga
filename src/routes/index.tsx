@@ -1264,7 +1264,7 @@ function Game() {
 
         // grimy viewport with faint warm interior glow
         const lit = (Math.sin(stationPulse) + 1) / 2;
-        const vpR = r * 0.32;
+        const vpR = r * 0.42;
         const vpGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, vpR);
         vpGrd.addColorStop(0, `rgba(230,200,140,${0.7 + lit * 0.2})`);
         vpGrd.addColorStop(0.7, "rgba(120,95,60,0.45)");
