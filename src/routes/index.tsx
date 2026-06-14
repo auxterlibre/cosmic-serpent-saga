@@ -268,22 +268,36 @@ function computeInventory(snake: Seg[], growth: string[]): Cost {
 }
 
 // Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
-// Costs ramp through rarities: common only -> + uncommon -> + rare -> + epic.
+// Costs ramp through rarities and scale steeply with level. Multi-shot is a
+// premium upgrade and requires rare loot from the first purchase.
 type Cost = Record<Rarity, number>;
-function costFor(level: number): Cost {
+type UpgradeKind = "fire" | "damage" | "range" | "multishot" | "speed" | "cap";
+function costFor(level: number, kind: UpgradeKind = "fire"): Cost {
   const c: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
-  // L1: 2 com
-  // L2: 3 com
-  // L3: 4 com + 1 unc
-  // L4: 4 com + 2 unc
-  // L5: 4 com + 3 unc + 1 rare
-  // L6: 5 com + 3 unc + 2 rare
-  // L7: 5 com + 4 unc + 2 rare + 1 epic
-  // ... general:
-  c.common = 1 + Math.min(5, level);
-  if (level >= 3) c.uncommon = 1 + Math.floor((level - 3) / 2);
-  if (level >= 5) c.rare = 1 + Math.floor((level - 5) / 2);
-  if (level >= 7) c.epic = 1 + Math.floor((level - 7) / 2);
+  if (kind === "multishot") {
+    // Premium: needs rare from L1, epic from L2.
+    // L1: 4 com + 2 unc + 1 rare
+    // L2: 6 com + 3 unc + 2 rare + 1 epic
+    // L3: 8 com + 4 unc + 3 rare + 2 epic
+    // L4: 10 com + 5 unc + 4 rare + 3 epic
+    c.common = 2 + level * 2;
+    c.uncommon = 1 + level;
+    c.rare = level;
+    c.epic = Math.max(0, level - 1);
+    return c;
+  }
+  // Inflated standard ramp (steeper than before).
+  // L1: 3 com
+  // L2: 5 com + 1 unc
+  // L3: 7 com + 2 unc
+  // L4: 9 com + 3 unc + 1 rare
+  // L5: 11 com + 4 unc + 2 rare
+  // L6: 13 com + 5 unc + 3 rare + 1 epic
+  // L7: 15 com + 6 unc + 4 rare + 2 epic
+  c.common = 1 + level * 2;
+  if (level >= 2) c.uncommon = level - 1;
+  if (level >= 4) c.rare = level - 3;
+  if (level >= 6) c.epic = level - 5;
   return c;
 }
 function canAfford(inv: Cost, cost: Cost): boolean {
