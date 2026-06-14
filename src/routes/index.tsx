@@ -1951,7 +1951,7 @@ function Game() {
             <div className="mt-2 text-sm opacity-80">Score {hud.score} · Length {hud.length}</div>
             <button
               onClick={reset}
-              className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm hover:bg-cyan-500/30"
+              className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
             >
               Restart
             </button>
