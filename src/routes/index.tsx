@@ -126,7 +126,8 @@ function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astP
 const INITIAL_LENGTH = 1;
 const INITIAL_CAP = 6;
 const OVER_CAP_MS = 5000;
-const START: Vec = { x: WORLD_W / 2, y: WORLD_H / 2 };
+// Player spawns near (but not on top of) the central checkpoint.
+const START: Vec = { x: WORLD_W / 2 + 6, y: WORLD_H / 2 + 4 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
 // Returns the inner edge distance from the world boundary at world coords (x,y).
