@@ -1738,13 +1738,22 @@ function Game() {
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+      <style>{`
+        @keyframes res-blink {
+          0%, 100% { transform: scale(1); filter: brightness(1); text-shadow: none; }
+          15% { transform: scale(1.35); filter: brightness(1.9); text-shadow: 0 0 10px currentColor, 0 0 18px currentColor; }
+          40% { transform: scale(0.95); filter: brightness(1.3); }
+          65% { transform: scale(1.18); filter: brightness(1.6); text-shadow: 0 0 8px currentColor; }
+        }
+        .res-blink { animation: res-blink 0.6s ease-out; }
+      `}</style>
       <canvas ref={canvasRef} className="block touch-none" style={{ touchAction: "none" }} />
 
       {started && hud.alive && !shop.open && (
         <button
           onClick={togglePause}
           aria-label={paused ? "Resume" : "Pause"}
-          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-500/40 bg-black/50 text-cyan-200 backdrop-blur hover:bg-black/70"
+          className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full border border-cyan-500/40 bg-black/50 text-cyan-200 backdrop-blur transition-transform duration-75 hover:bg-black/70 active:scale-90 active:brightness-125"
         >
           {paused ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
