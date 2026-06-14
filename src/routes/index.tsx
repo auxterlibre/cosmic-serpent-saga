@@ -2380,6 +2380,31 @@ function Game() {
         </button>
       )}
 
+      {started && hud.alive && (
+        <div className="pointer-events-none absolute left-4 top-4 flex flex-col gap-1 rounded-md border border-cyan-500/40 bg-black/50 px-2 py-1.5 font-mono text-[10px] text-cyan-200 backdrop-blur">
+          <div className="flex items-center gap-1 opacity-80">
+            <span>CARGO</span>
+            <span className="ml-auto tabular-nums">{Math.min(hud.length - 1, hud.segCap)}/{hud.segCap}</span>
+          </div>
+          <div className="flex max-w-[140px] flex-wrap gap-[3px]">
+            {Array.from({ length: hud.segCap }).map((_, i) => {
+              const filled = i < hud.length - 1;
+              return (
+                <span
+                  key={i}
+                  className={
+                    "h-2.5 w-2.5 rounded-[2px] border " +
+                    (filled
+                      ? "border-cyan-300 bg-cyan-400 shadow-[0_0_4px_rgba(34,211,238,0.8)]"
+                      : "border-cyan-500/40 bg-cyan-500/10")
+                  }
+                />
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {!started && hud.alive && (
         <div className="absolute inset-0 flex items-center justify-center bg-black/70 px-6">
           <div className="w-full max-w-sm rounded-lg border border-cyan-500/40 bg-[#0a0a18] px-6 py-6 font-mono text-cyan-200">
