@@ -493,13 +493,31 @@ function Game() {
         }
       }
 
-      // Expire over-cap segments whose 5s timer has run out.
+      // Expire over-cap segments whose timer has run out — they detach from
+      // the tail and scatter back as loot the player can re-collect.
       {
         const now = performance.now();
-        for (let i = s.snake.length - 1; i >= 1; i--) {
+        let firstExpired = -1;
+        for (let i = 1; i < s.snake.length; i++) {
           const seg = s.snake[i];
           if (seg.overCapUntil !== undefined && now >= seg.overCapUntil) {
-            s.snake.splice(i, 1);
+            firstExpired = i;
+            break;
+          }
+        }
+        if (firstExpired !== -1) {
+          const detached = s.snake.splice(firstExpired);
+          for (const d of detached) {
+            let rar: Rarity = "common";
+            for (const r of RARITY_ORDER) if (RARITY_INFO[r].color === d.color) { rar = r; break; }
+            const jx = (Math.random() - 0.5) * 1.2;
+            const jy = (Math.random() - 0.5) * 1.2;
+            s.loot.push({
+              x: Math.max(0, Math.min(WORLD_W - 1, d.x + jx)),
+              y: Math.max(0, Math.min(WORLD_H - 1, d.y + jy)),
+              color: d.color,
+              rarity: rar,
+            });
           }
         }
       }
@@ -509,15 +527,9 @@ function Game() {
         const color = s.growth.shift()!;
         const bodyCount = s.snake.length - 1; // excludes head
         if (bodyCount >= s.segCap) {
-          // Over-cap: if another over-cap segment already exists, drop ALL
-          // over-cap segments (the new pickup included) — greed punishes you.
-          const hasOver = s.snake.some((sg) => sg.overCapUntil !== undefined);
-          if (hasOver) {
-            for (let i = s.snake.length - 1; i >= 1; i--) {
-              if (s.snake[i].overCapUntil !== undefined) s.snake.splice(i, 1);
-            }
-            continue;
-          }
+          // Over-cap: each extra pickup adds another blinking red segment
+          // with its own timer. When any timer expires, the whole over-cap
+          // tail detaches and scatters as loot.
           s.snake.push({ x: tail.x, y: tail.y, color, overCapUntil: performance.now() + OVER_CAP_MS });
         } else {
           s.snake.push({ x: tail.x, y: tail.y, color });
