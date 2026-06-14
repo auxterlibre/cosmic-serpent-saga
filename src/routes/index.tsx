@@ -521,6 +521,7 @@ function Game() {
     spendSegments(cost);
     s.growth.push(RARITY_INFO[to].color);
     syncHud();
+    flashRes([from, to]);
   }
 
   // Breakdown: 1 of a higher rarity -> 2 of the rarity below.
