@@ -1205,9 +1205,9 @@ function Game() {
         }
 
         // ---- main hub: irregular, riveted plating ----
-        ctx.fillStyle = "#2b2f3a";
-        ctx.strokeStyle = "#9ca3af";
-        ctx.lineWidth = 1.2;
+        ctx.fillStyle = "#34373f";
+        ctx.strokeStyle = "#7a7d85";
+        ctx.lineWidth = 1.3;
         ctx.beginPath();
         const sides = 7;
         for (let i = 0; i < sides; i++) {
@@ -1222,32 +1222,32 @@ function Game() {
         ctx.stroke();
 
         // patchwork plating seams
-        ctx.strokeStyle = "rgba(156,163,175,0.35)";
-        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = "rgba(140,143,150,0.35)";
+        ctx.lineWidth = 0.7;
         ctx.beginPath();
         ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(r * 0.5, -r * 0.1);
         ctx.moveTo(-r * 0.1, -r * 0.7); ctx.lineTo(0, r * 0.6);
         ctx.stroke();
 
         // tiny rivets
-        ctx.fillStyle = "#6b7280";
-        for (let i = 0; i < 6; i++) {
-          const a = (i / 6) * Math.PI * 2 + 0.3;
-          ctx.fillRect(Math.cos(a) * r * 0.78 - 0.5, Math.sin(a) * r * 0.78 - 0.5, 1, 1);
+        ctx.fillStyle = "#5a5d65";
+        for (let i = 0; i < 8; i++) {
+          const a = (i / 8) * Math.PI * 2 + 0.3;
+          ctx.fillRect(Math.cos(a) * r * 0.8 - 0.6, Math.sin(a) * r * 0.8 - 0.6, 1.2, 1.2);
         }
 
-        // grimy viewport with warm interior glow
+        // grimy viewport with faint warm interior glow
         const lit = (Math.sin(stationPulse) + 1) / 2;
-        const vpR = r * 0.34;
+        const vpR = r * 0.32;
         const vpGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, vpR);
-        vpGrd.addColorStop(0, `rgba(253,224,71,${0.85 + lit * 0.15})`);
-        vpGrd.addColorStop(0.6, "rgba(217,119,6,0.7)");
-        vpGrd.addColorStop(1, "rgba(120,53,15,0.2)");
+        vpGrd.addColorStop(0, `rgba(230,200,140,${0.7 + lit * 0.2})`);
+        vpGrd.addColorStop(0.7, "rgba(120,95,60,0.45)");
+        vpGrd.addColorStop(1, "rgba(40,32,22,0.15)");
         ctx.fillStyle = vpGrd;
         ctx.beginPath();
         ctx.arc(0, 0, vpR, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = "#fbbf24";
+        ctx.strokeStyle = "rgba(180,150,100,0.8)";
         ctx.lineWidth = 0.8;
         ctx.stroke();
 
