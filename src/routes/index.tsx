@@ -1936,7 +1936,7 @@ function Game() {
             </div>
             <button
               onClick={closeShop}
-              className="mt-4 w-full rounded bg-cyan-500/20 px-3 py-2 text-sm hover:bg-cyan-500/30"
+              className="mt-4 w-full rounded bg-cyan-500/20 px-3 py-2 text-sm transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
             >
               Leave
             </button>
