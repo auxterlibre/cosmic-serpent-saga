@@ -95,8 +95,41 @@ const OVER_CAP_MS = 5000;
 const START: Vec = { x: 50, y: 50 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
+// Asteroid size variations (in cells).
+const ASTEROID_SIZES = [2.2, 3, 3, 4, 5];
+function pickAsteroidSize(): number {
+  return ASTEROID_SIZES[rand(ASTEROID_SIZES.length)];
+}
 function makeObstacles(): Obstacle[] {
-  return Array.from({ length: OBSTACLE_COUNT }, () => ({ ...randPosAway(START) }));
+  const list: Obstacle[] = [];
+  // Scattered field asteroids
+  for (let i = 0; i < OBSTACLE_COUNT; i++) {
+    const p = randPosAway(START);
+    // keep field asteroids away from the belt band
+    const margin = 7;
+    const x = Math.min(WORLD_W - margin, Math.max(margin, p.x));
+    const y = Math.min(WORLD_H - margin, Math.max(margin, p.y));
+    list.push({ x, y, size: pickAsteroidSize() });
+  }
+  // Asteroid belt around the world boundaries
+  const BELT_BAND = 5; // band thickness in cells from each edge
+  const BELT_DENSITY = 0.18; // asteroids per cell along the perimeter
+  const perimeter = 2 * (WORLD_W + WORLD_H);
+  const beltCount = Math.floor(perimeter * BELT_DENSITY);
+  for (let i = 0; i < beltCount; i++) {
+    const edge = rand(4);
+    let x = 0, y = 0;
+    const t = Math.random();
+    const band = Math.random() * BELT_BAND;
+    if (edge === 0) { x = t * WORLD_W; y = band; }
+    else if (edge === 1) { x = t * WORLD_W; y = WORLD_H - band; }
+    else if (edge === 2) { x = band; y = t * WORLD_H; }
+    else { x = WORLD_W - band; y = t * WORLD_H; }
+    // bigger, chunkier rocks in the belt
+    const size = Math.random() < 0.35 ? 5 + Math.random() * 2 : 3 + Math.random() * 2;
+    list.push({ x, y, size });
+  }
+  return list;
 }
 function makeHunters(): Hunter[] {
   return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
