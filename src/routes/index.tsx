@@ -788,7 +788,15 @@ function Game() {
             }
             tx = h.fleeTarget.x + 0.5;
             ty = h.fleeTarget.y + 0.5;
+          } else if (loot <= 0) {
+            // No loot to steal — wander instead of hunting the player.
+            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+            }
+            tx = h.wanderTarget.x;
+            ty = h.wanderTarget.y;
           } else {
+            h.wanderTarget = null;
             let bestD = Infinity;
             let bx = 0, by = 0;
             for (let i = 0; i < s.snake.length; i++) {
