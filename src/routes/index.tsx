@@ -1171,7 +1171,7 @@ function Game() {
                 s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
                 s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
                 s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
-                s.scrap += 8 + Math.floor(Math.random() * 5);
+                dropScraps(w.x + 0.5, w.y + 0.5, 8 + Math.floor(Math.random() * 5));
                 s.wardens.splice(i, 1);
                 syncHud();
               }
