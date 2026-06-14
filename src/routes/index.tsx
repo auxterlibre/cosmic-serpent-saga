@@ -20,7 +20,9 @@ const TURN_RATE = 8.5;
 const SEG_SPACING = 0.85;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
-const HUNTER_COUNT = 8;
+const HUNTER_MIN = 1;
+const HUNTER_MAX = 10;
+const HUNTER_PER_LOOT = 1 / 3; // +1 hunter per 3 loot segments carried
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
