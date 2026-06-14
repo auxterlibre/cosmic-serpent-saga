@@ -1124,105 +1124,94 @@ function Game() {
         // deterministic per-station seed so each looks unique but stable
         const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
         const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
-        const r = CELL * 0.7;
+        const r = CELL * 1.0;
 
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(rot);
 
-        // ---- spindly truss arms with mismatched modules ----
-        const arms = 3;
-        for (let i = 0; i < arms; i++) {
-          const a = (i / arms) * Math.PI * 2;
-          const ax = Math.cos(a);
-          const ay = Math.sin(a);
-          const armLen = r + 10 + ((seed >> (i * 2)) & 0xb);
-          // truss strut
-          ctx.strokeStyle = "#7a7d85";
-          ctx.lineWidth = 1.3;
-          ctx.beginPath();
-          ctx.moveTo(ax * (r - 1), ay * (r - 1));
-          ctx.lineTo(ax * armLen, ay * armLen);
-          ctx.stroke();
-          // cross-hatch ribs
-          ctx.strokeStyle = "rgba(122,125,133,0.55)";
-          for (let k = 1; k < 3; k++) {
-            const t = k / 3;
-            const mx = ax * (r + (armLen - r) * t);
-            const my = ay * (r + (armLen - r) * t);
-            ctx.beginPath();
-            ctx.moveTo(mx - ay * 3, my + ax * 3);
-            ctx.lineTo(mx + ay * 3, my - ax * 3);
-            ctx.stroke();
-          }
-          // module at the end — alternating tank / solar panel / antenna
-          const mod = (i + (seed & 3)) % 3;
-          const ex = ax * (armLen + 3);
-          const ey = ay * (armLen + 3);
-          if (mod === 0) {
-            // weathered fuel tank
-            ctx.fillStyle = "#4a4640";
-            ctx.strokeStyle = "#2a2622";
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.arc(ex, ey, 5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-            ctx.fillStyle = "rgba(0,0,0,0.4)";
-            ctx.fillRect(ex - 5, ey - 0.5, 10, 1);
-          } else if (mod === 1) {
-            // solar panel (perpendicular plate) — muted grey-blue
-            ctx.save();
-            ctx.translate(ex, ey);
-            ctx.rotate(a + Math.PI / 2);
-            ctx.fillStyle = "#2d343f";
-            ctx.fillRect(-8, -2, 16, 4);
-            ctx.strokeStyle = "#4a5260";
-            ctx.lineWidth = 0.5;
-            for (let g = -6; g <= 6; g += 2) {
-              ctx.beginPath();
-              ctx.moveTo(g, -2);
-              ctx.lineTo(g, 2);
-              ctx.stroke();
-            }
-            ctx.strokeStyle = "#1a1d24";
-            ctx.strokeRect(-8, -2, 16, 4);
-            ctx.restore();
-          } else {
-            // antenna with blinking tip
-            ctx.strokeStyle = "#b4b7bd";
-            ctx.lineWidth = 0.9;
-            ctx.beginPath();
-            ctx.moveTo(ex, ey);
-            ctx.lineTo(ex + ax * 6, ey + ay * 6);
-            ctx.stroke();
-            const blink = (Math.sin(tStation / 220 + i) + 1) / 2;
-            ctx.fillStyle = `rgba(220,90,70,${0.35 + blink * 0.55})`;
-            ctx.beginPath();
-            ctx.arc(ex + ax * 6, ey + ay * 6, 1.6, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
-
         // ---- main hub: octagonal plated core ----
         const hubR = r * 1.05;
+        const sides = 8;
+        // pre-compute octagon vertices
+        const verts: { x: number; y: number; a: number }[] = [];
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * Math.PI * 2 + Math.PI / 8;
+          verts.push({ x: Math.cos(a) * hubR, y: Math.sin(a) * hubR, a });
+        }
+
+        // ---- landing docks on a few faces (drawn under hull) ----
+        const dockFaces = [0, 3, 5]; // which face midpoints get docks
+        for (const fi of dockFaces) {
+          const v1 = verts[fi];
+          const v2 = verts[(fi + 1) % sides];
+          const mx = (v1.x + v2.x) / 2;
+          const my = (v1.y + v2.y) / 2;
+          const fa = Math.atan2(my, mx); // outward normal
+          const nx = Math.cos(fa);
+          const ny = Math.sin(fa);
+          // perpendicular along face
+          const tx = -ny;
+          const ty = nx;
+          const dockW = hubR * 0.42;
+          const dockL = hubR * 0.28;
+          // outer corners (trapezoid wider at base)
+          const baseW = dockW;
+          const tipW = dockW * 0.72;
+          const bx1 = mx + tx * baseW - nx * 1;
+          const by1 = my + ty * baseW - ny * 1;
+          const bx2 = mx - tx * baseW - nx * 1;
+          const by2 = my - ty * baseW - ny * 1;
+          const tx1 = mx + tx * tipW + nx * dockL;
+          const ty1 = my + ty * tipW + ny * dockL;
+          const tx2 = mx - tx * tipW + nx * dockL;
+          const ty2 = my - ty * tipW + ny * dockL;
+          ctx.fillStyle = "#2e3138";
+          ctx.strokeStyle = "#7a7d85";
+          ctx.lineWidth = 1.1;
+          ctx.beginPath();
+          ctx.moveTo(bx1, by1);
+          ctx.lineTo(tx1, ty1);
+          ctx.lineTo(tx2, ty2);
+          ctx.lineTo(bx2, by2);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          // bay opening (darker rect on the tip)
+          const opMx = (tx1 + tx2) / 2;
+          const opMy = (ty1 + ty2) / 2;
+          ctx.fillStyle = "#15171c";
+          ctx.beginPath();
+          ctx.moveTo(opMx + tx * tipW * 0.55, opMy + ty * tipW * 0.55);
+          ctx.lineTo(opMx + tx * tipW * 0.55 - nx * 2, opMy + ty * tipW * 0.55 - ny * 2);
+          ctx.lineTo(opMx - tx * tipW * 0.55 - nx * 2, opMy - ty * tipW * 0.55 - ny * 2);
+          ctx.lineTo(opMx - tx * tipW * 0.55, opMy - ty * tipW * 0.55);
+          ctx.closePath();
+          ctx.fill();
+          // tiny landing lights flanking the bay
+          const lblink = (Math.sin(tStation / 380 + fi * 1.7) + 1) / 2;
+          ctx.fillStyle = `rgba(120,200,140,${0.45 + lblink * 0.45})`;
+          ctx.beginPath();
+          ctx.arc(tx1, ty1, 0.9, 0, Math.PI * 2);
+          ctx.arc(tx2, ty2, 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // hull fill + outline
         ctx.fillStyle = "#3a3d45";
         ctx.strokeStyle = "#8a8d95";
         ctx.lineWidth = 1.6;
         ctx.beginPath();
-        const sides = 8;
         for (let i = 0; i < sides; i++) {
-          const a = (i / sides) * Math.PI * 2 + Math.PI / 8;
-          const x = Math.cos(a) * hubR;
-          const y = Math.sin(a) * hubR;
-          if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          const v = verts[i];
+          if (i === 0) ctx.moveTo(v.x, v.y); else ctx.lineTo(v.x, v.y);
         }
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
         // inner octagonal panel ring
-        const innerR = hubR * 0.7;
+        const innerR = hubR * 0.62;
         ctx.strokeStyle = "rgba(140,143,150,0.55)";
         ctx.lineWidth = 0.9;
         ctx.beginPath();
@@ -1235,7 +1224,7 @@ function Game() {
         ctx.closePath();
         ctx.stroke();
 
-        // radial plating seams from inner ring to outer hull
+        // radial plating seams
         ctx.strokeStyle = "rgba(120,123,130,0.5)";
         ctx.lineWidth = 0.7;
         for (let i = 0; i < sides; i++) {
@@ -1259,12 +1248,12 @@ function Game() {
         ctx.save();
         ctx.rotate(Math.PI / 8);
         ctx.fillStyle = "rgba(200,170,80,0.55)";
-        ctx.fillRect(hubR * 0.42, -1.2, hubR * 0.28, 2.4);
+        ctx.fillRect(hubR * 0.32, -1.4, hubR * 0.26, 2.8);
         ctx.restore();
 
         // grimy viewport with faint warm interior glow
         const lit = (Math.sin(stationPulse) + 1) / 2;
-        const vpR = r * 0.42;
+        const vpR = r * 0.4;
         const vpGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, vpR);
         vpGrd.addColorStop(0, `rgba(230,200,140,${0.7 + lit * 0.2})`);
         vpGrd.addColorStop(0.7, "rgba(120,95,60,0.45)");
@@ -1275,16 +1264,6 @@ function Game() {
         ctx.fill();
         ctx.strokeStyle = "rgba(180,150,100,0.8)";
         ctx.lineWidth = 0.8;
-        ctx.stroke();
-
-        // docking clamp (a small open notch)
-        ctx.strokeStyle = "#e5e7eb";
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.moveTo(r * 0.55, -3);
-        ctx.lineTo(r * 0.95, -3);
-        ctx.moveTo(r * 0.55, 3);
-        ctx.lineTo(r * 0.95, 3);
         ctx.stroke();
 
         ctx.restore();
