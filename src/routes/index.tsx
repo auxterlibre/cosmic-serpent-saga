@@ -1112,56 +1112,158 @@ function Game() {
       ctx.strokeRect(-camX, -camY, WORLD_W * CELL, WORLD_H * CELL);
       ctx.setLineDash([]);
 
-      // ---- Checkpoints: space stations ----
-      const stationPulse = (performance.now() / 600) % (Math.PI * 2);
+      // ---- Checkpoints: make-shift space stations ----
+      const tStation = performance.now();
+      const stationPulse = (tStation / 600) % (Math.PI * 2);
       for (const cp of s.checkpoints) {
         const px = cp.x * CELL - camX;
         const py = cp.y * CELL - camY;
         if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW + CELL || py > wViewH + CELL) continue;
         const cx = px + CELL / 2;
         const cy = py + CELL / 2;
-        const r = CELL * 0.55;
-        // outer ring
-        ctx.strokeStyle = "#f0abfc";
-        ctx.lineWidth = 1.5;
+        // deterministic per-station seed so each looks unique but stable
+        const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
+        const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
+        const r = CELL * 0.42;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+
+        // ---- spindly truss arms with mismatched modules ----
+        const arms = 3;
+        for (let i = 0; i < arms; i++) {
+          const a = (i / arms) * Math.PI * 2;
+          const ax = Math.cos(a);
+          const ay = Math.sin(a);
+          const armLen = r + 6 + ((seed >> (i * 2)) & 0x7);
+          // truss strut
+          ctx.strokeStyle = "#9ca3af";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(ax * (r - 1), ay * (r - 1));
+          ctx.lineTo(ax * armLen, ay * armLen);
+          ctx.stroke();
+          // cross-hatch ribs
+          ctx.strokeStyle = "rgba(156,163,175,0.55)";
+          for (let k = 1; k < 3; k++) {
+            const t = k / 3;
+            const mx = ax * (r + (armLen - r) * t);
+            const my = ay * (r + (armLen - r) * t);
+            ctx.beginPath();
+            ctx.moveTo(mx - ay * 2, my + ax * 2);
+            ctx.lineTo(mx + ay * 2, my - ax * 2);
+            ctx.stroke();
+          }
+          // module at the end — alternating tank / solar panel / antenna
+          const mod = (i + (seed & 3)) % 3;
+          const ex = ax * (armLen + 3);
+          const ey = ay * (armLen + 3);
+          if (mod === 0) {
+            // rusty fuel tank
+            ctx.fillStyle = "#7c5a3a";
+            ctx.strokeStyle = "#3f2a1a";
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.arc(ex, ey, 3.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = "rgba(0,0,0,0.35)";
+            ctx.fillRect(ex - 3.5, ey - 0.5, 7, 1);
+          } else if (mod === 1) {
+            // solar panel (perpendicular plate)
+            ctx.save();
+            ctx.translate(ex, ey);
+            ctx.rotate(a + Math.PI / 2);
+            ctx.fillStyle = "#1e3a8a";
+            ctx.fillRect(-5, -1.5, 10, 3);
+            ctx.strokeStyle = "#60a5fa";
+            ctx.lineWidth = 0.5;
+            for (let g = -4; g <= 4; g += 2) {
+              ctx.beginPath();
+              ctx.moveTo(g, -1.5);
+              ctx.lineTo(g, 1.5);
+              ctx.stroke();
+            }
+            ctx.strokeStyle = "#1e293b";
+            ctx.strokeRect(-5, -1.5, 10, 3);
+            ctx.restore();
+          } else {
+            // antenna with blinking tip
+            ctx.strokeStyle = "#cbd5e1";
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(ex, ey);
+            ctx.lineTo(ex + ax * 4, ey + ay * 4);
+            ctx.stroke();
+            const blink = (Math.sin(tStation / 220 + i) + 1) / 2;
+            ctx.fillStyle = `rgba(239,68,68,${0.4 + blink * 0.6})`;
+            ctx.beginPath();
+            ctx.arc(ex + ax * 4, ey + ay * 4, 1.4, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // ---- main hub: irregular, riveted plating ----
+        ctx.fillStyle = "#2b2f3a";
+        ctx.strokeStyle = "#9ca3af";
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.arc(cx, cy, r + 3, 0, Math.PI * 2);
-        ctx.stroke();
-        // hub octagon (outline)
-        ctx.strokeStyle = "#d8b4fe";
-        ctx.fillStyle = "#1a0b2e";
-        ctx.beginPath();
-        for (let i = 0; i < 8; i++) {
-          const a = (i / 8) * Math.PI * 2 + Math.PI / 8;
-          const x = cx + Math.cos(a) * r;
-          const y = cy + Math.sin(a) * r;
+        const sides = 7;
+        for (let i = 0; i < sides; i++) {
+          const a = (i / sides) * Math.PI * 2;
+          const wob = 0.82 + (((seed >> (i * 3)) & 0xf) / 15) * 0.32;
+          const x = Math.cos(a) * r * wob;
+          const y = Math.sin(a) * r * wob;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
         }
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        // solar panels (struts)
-        ctx.strokeStyle = "#a855f7";
+
+        // patchwork plating seams
+        ctx.strokeStyle = "rgba(156,163,175,0.35)";
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.moveTo(-r * 0.6, -r * 0.2); ctx.lineTo(r * 0.5, -r * 0.1);
+        ctx.moveTo(-r * 0.1, -r * 0.7); ctx.lineTo(0, r * 0.6);
+        ctx.stroke();
+
+        // tiny rivets
+        ctx.fillStyle = "#6b7280";
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 + 0.3;
+          ctx.fillRect(Math.cos(a) * r * 0.78 - 0.5, Math.sin(a) * r * 0.78 - 0.5, 1, 1);
+        }
+
+        // grimy viewport with warm interior glow
+        const lit = (Math.sin(stationPulse) + 1) / 2;
+        const vpR = r * 0.34;
+        const vpGrd = ctx.createRadialGradient(0, 0, 0, 0, 0, vpR);
+        vpGrd.addColorStop(0, `rgba(253,224,71,${0.85 + lit * 0.15})`);
+        vpGrd.addColorStop(0.6, "rgba(217,119,6,0.7)");
+        vpGrd.addColorStop(1, "rgba(120,53,15,0.2)");
+        ctx.fillStyle = vpGrd;
+        ctx.beginPath();
+        ctx.arc(0, 0, vpR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fbbf24";
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // docking clamp (a small open notch)
+        ctx.strokeStyle = "#e5e7eb";
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(cx - r - 4, cy); ctx.lineTo(cx - r - 8, cy);
-        ctx.moveTo(cx + r + 4, cy); ctx.lineTo(cx + r + 8, cy);
-        ctx.moveTo(cx, cy - r - 4); ctx.lineTo(cx, cy - r - 8);
-        ctx.moveTo(cx, cy + r + 4); ctx.lineTo(cx, cy + r + 8);
+        ctx.moveTo(r * 0.55, -3);
+        ctx.lineTo(r * 0.95, -3);
+        ctx.moveTo(r * 0.55, 3);
+        ctx.lineTo(r * 0.95, 3);
         ctx.stroke();
-        // panel ends
-        ctx.fillStyle = "#7c3aed";
-        ctx.fillRect(cx - r - 10, cy - 3, 3, 6);
-        ctx.fillRect(cx + r + 7, cy - 3, 3, 6);
-        ctx.fillRect(cx - 3, cy - r - 10, 6, 3);
-        ctx.fillRect(cx - 3, cy + r + 7, 6, 3);
-        // central docking light (pulses)
-        const lit = (Math.sin(stationPulse) + 1) / 2;
-        ctx.fillStyle = `rgba(253, 224, 71, ${0.5 + lit * 0.5})`;
-        ctx.beginPath();
-        ctx.arc(cx, cy, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-        // $ tag
+
+        ctx.restore();
+
+        // $ tag floating just above the hub (un-rotated for readability)
         ctx.fillStyle = "#fde68a";
         ctx.font = "bold 9px monospace";
         ctx.fillText("$", cx - 2.5, cy + 3.5);
