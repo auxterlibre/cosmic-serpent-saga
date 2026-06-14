@@ -1118,13 +1118,6 @@ function Game() {
                 life: lifeMs,
               });
             }
-                x: head.x,
-                y: head.y,
-                vx: (dx / len) * PROJ_SPEED,
-                vy: (dy / len) * PROJ_SPEED,
-                life: lifeMs,
-              });
-            }
           } else {
             s.fireTimer = s.fireIntervalMs;
           }
