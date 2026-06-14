@@ -1138,8 +1138,8 @@ function Game() {
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
-                // Hunters drop scrap parts on death.
-                s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
+                // Hunters drop scrap parts on death — must be picked up like loot.
+                dropScraps(h.x + 0.5, h.y + 0.5, 2 + Math.floor(Math.random() * 3));
                 // If they were carrying stolen segments, scatter them as loot.
                 for (const st of h.stolen) {
                   const jx = (Math.random() - 0.5) * 2;
