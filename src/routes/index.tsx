@@ -1124,7 +1124,7 @@ function Game() {
         // deterministic per-station seed so each looks unique but stable
         const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
         const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
-        const r = CELL * 0.42;
+        const r = CELL * 0.7;
 
         ctx.save();
         ctx.translate(cx, cy);
