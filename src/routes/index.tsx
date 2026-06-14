@@ -47,6 +47,9 @@ type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 type Explosion = { x: number; y: number; t0: number };
 type Debris = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; size: number; t0: number; seed: number; baseFill: string; craterC: string };
 type Pickup = { x: number; y: number; t0: number; color: string; value: number; rarity: Rarity };
+type Scrap = { x: number; y: number; vx: number; vy: number; value: number; spawnedAt: number };
+
+const SCRAP_COLOR = "#f59e0b";
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
   ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 },
@@ -279,8 +282,8 @@ function initialSnake(): Seg[] {
   return [{ x: START.x, y: START.y, color: SEG_COLOR_DEFAULT }];
 }
 
-function computeInventory(snake: Seg[], growth: string[]): Cost {
-  const inv: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+function computeInventory(snake: Seg[], growth: string[], scrap = 0): Cost {
+  const inv: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0, scrap };
   const tally = (color: string) => {
     for (const r of RARITY_ORDER) {
       if (RARITY_INFO[r].color === color) { inv[r]++; return; }
@@ -294,38 +297,28 @@ function computeInventory(snake: Seg[], growth: string[]): Cost {
 // Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
 // Costs ramp through rarities and scale steeply with level. Multi-shot is a
 // premium upgrade and requires rare loot from the first purchase.
-type Cost = Record<Rarity, number>;
+type Cost = { common: number; uncommon: number; rare: number; epic: number; scrap: number };
 type UpgradeKind = "fire" | "damage" | "range" | "multishot" | "speed" | "cap";
+function emptyCost(): Cost { return { common: 0, uncommon: 0, rare: 0, epic: 0, scrap: 0 }; }
 function costFor(level: number, kind: UpgradeKind = "fire"): Cost {
-  const c: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+  const c: Cost = emptyCost();
   if (kind === "multishot") {
-    // Premium: needs rare from L1, epic from L2.
-    // L1: 4 com + 2 unc + 1 rare
-    // L2: 6 com + 3 unc + 2 rare + 1 epic
-    // L3: 8 com + 4 unc + 3 rare + 2 epic
-    // L4: 10 com + 5 unc + 4 rare + 3 epic
     c.common = 2 + level * 2;
     c.uncommon = 1 + level;
     c.rare = level;
     c.epic = Math.max(0, level - 1);
+    c.scrap = 15 + level * 10;
     return c;
   }
-  // Inflated standard ramp (steeper than before).
-  // L1: 3 com
-  // L2: 5 com + 1 unc
-  // L3: 7 com + 2 unc
-  // L4: 9 com + 3 unc + 1 rare
-  // L5: 11 com + 4 unc + 2 rare
-  // L6: 13 com + 5 unc + 3 rare + 1 epic
-  // L7: 15 com + 6 unc + 4 rare + 2 epic
   c.common = 1 + level * 2;
   if (level >= 2) c.uncommon = level - 1;
   if (level >= 4) c.rare = level - 3;
   if (level >= 6) c.epic = level - 5;
+  c.scrap = 5 + level * 5;
   return c;
 }
 function canAfford(inv: Cost, cost: Cost): boolean {
-  return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic;
+  return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic && inv.scrap >= cost.scrap;
 }
 
 function initialState() {
@@ -346,6 +339,7 @@ function initialState() {
     explosions: [] as Explosion[],
     debris: [] as Debris[],
     pickups: [] as Pickup[],
+    scraps: [] as Scrap[],
     lastHeadX: START.x,
     lastHeadY: START.y,
     alive: true,
@@ -389,7 +383,7 @@ function Game() {
     fireRange: 8,
     multishot: 1,
     playerSpeed: BASE_PLAYER_SPEED,
-    inventory: { common: 0, uncommon: 0, rare: 0, epic: 0 } as Cost,
+    inventory: emptyCost(),
     scrap: 0,
     lvlFireRate: 1,
     lvlDamage: 1,
@@ -530,6 +524,7 @@ function Game() {
 
   function spendSegments(cost: Cost) {
     const s = stateRef.current;
+    if (cost.scrap) s.scrap = Math.max(0, s.scrap - cost.scrap);
     for (const r of RARITY_ORDER) {
       let need = cost[r];
       if (need <= 0) continue;
@@ -545,6 +540,23 @@ function Game() {
     }
   }
 
+  function dropScraps(cx: number, cy: number, count: number) {
+    const s = stateRef.current;
+    const now = performance.now();
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1.5 + Math.random() * 2.5;
+      s.scraps.push({
+        x: Math.max(0.3, Math.min(WORLD_W - 0.3, cx)),
+        y: Math.max(0.3, Math.min(WORLD_H - 0.3, cy)),
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        value: 1,
+        spawnedAt: now,
+      });
+    }
+  }
+
   function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed" | "lvlCap", apply: () => void) {
     const s = stateRef.current;
     const kindMap: Record<typeof lvlKey, UpgradeKind> = {
@@ -552,7 +564,7 @@ function Game() {
       lvlMultishot: "multishot", lvlSpeed: "speed", lvlCap: "cap",
     };
     const cost = costFor(s[lvlKey], kindMap[lvlKey]);
-    const inv = computeInventory(s.snake, s.growth);
+    const inv = computeInventory(s.snake, s.growth, s.scrap);
     if (!canAfford(inv, cost)) return;
     spendSegments(cost);
     apply();
@@ -598,9 +610,9 @@ function Game() {
     if (idx < 0 || idx >= RARITY_ORDER.length - 1) return;
     const to = RARITY_ORDER[idx + 1];
     const s = stateRef.current;
-    const inv = computeInventory(s.snake, s.growth);
+    const inv = computeInventory(s.snake, s.growth, s.scrap);
     if (inv[from] < CRAFT_COST) return;
-    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const cost: Cost = emptyCost();
     cost[from] = CRAFT_COST;
     spendSegments(cost);
     s.growth.push(RARITY_INFO[to].color);
@@ -615,9 +627,9 @@ function Game() {
     if (idx <= 0) return;
     const to = RARITY_ORDER[idx - 1];
     const s = stateRef.current;
-    const inv = computeInventory(s.snake, s.growth);
+    const inv = computeInventory(s.snake, s.growth, s.scrap);
     if (inv[from] < 1) return;
-    const cost: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+    const cost: Cost = emptyCost();
     cost[from] = 1;
     spendSegments(cost);
     for (let i = 0; i < BREAKDOWN_YIELD; i++) s.growth.push(RARITY_INFO[to].color);
@@ -637,7 +649,7 @@ function Game() {
       fireRange: s.fireRange,
       multishot: s.multishot,
       playerSpeed: s.playerSpeed,
-      inventory: computeInventory(s.snake, s.growth),
+      inventory: computeInventory(s.snake, s.growth, s.scrap),
       scrap: s.scrap,
       lvlFireRate: s.lvlFireRate,
       lvlDamage: s.lvlDamage,
@@ -792,6 +804,35 @@ function Game() {
           hudDirty = true;
         }
       }
+
+      // Scrap drops: drift, decelerate, then can be picked up by the head.
+      {
+        const dts = dt / 1000;
+        const SCRAP_PICK = PICK * 1.15;
+        const SCRAP_LIFE = 30000; // 30s on the ground before despawn
+        const nowS = performance.now();
+        for (let i = s.scraps.length - 1; i >= 0; i--) {
+          const sc = s.scraps[i];
+          if (nowS - sc.spawnedAt > SCRAP_LIFE) { s.scraps.splice(i, 1); continue; }
+          sc.x += sc.vx * dts;
+          sc.y += sc.vy * dts;
+          sc.vx *= 0.92;
+          sc.vy *= 0.92;
+          if (sc.x < 0.2) { sc.x = 0.2; sc.vx = 0; }
+          if (sc.y < 0.2) { sc.y = 0.2; sc.vy = 0; }
+          if (sc.x > WORLD_W - 0.2) { sc.x = WORLD_W - 0.2; sc.vx = 0; }
+          if (sc.y > WORLD_H - 0.2) { sc.y = WORLD_H - 0.2; sc.vy = 0; }
+          const dx = sc.x - hx;
+          const dy = sc.y - hy;
+          if (dx * dx + dy * dy <= SCRAP_PICK * SCRAP_PICK) {
+            s.scrap += sc.value;
+            s.pickups.push({ x: sc.x, y: sc.y, t0: nowS, color: SCRAP_COLOR, value: sc.value, rarity: "common" });
+            s.scraps.splice(i, 1);
+            hudDirty = true;
+          }
+        }
+      }
+
 
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
@@ -1143,8 +1184,8 @@ function Game() {
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
-                // Hunters drop scrap parts on death.
-                s.scrap += 2 + Math.floor(Math.random() * 3); // 2-4
+                // Hunters drop scrap parts on death — must be picked up like loot.
+                dropScraps(h.x + 0.5, h.y + 0.5, 2 + Math.floor(Math.random() * 3));
                 // If they were carrying stolen segments, scatter them as loot.
                 for (const st of h.stolen) {
                   const jx = (Math.random() - 0.5) * 2;
@@ -1176,7 +1217,7 @@ function Game() {
                 s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
                 s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
                 s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
-                s.scrap += 8 + Math.floor(Math.random() * 5);
+                dropScraps(w.x + 0.5, w.y + 0.5, 8 + Math.floor(Math.random() * 5));
                 s.wardens.splice(i, 1);
                 syncHud();
               }
@@ -1641,6 +1682,48 @@ function Game() {
           }
         }
       }
+
+      // ---- Scrap drops: small orange bolts that pulse softly ----
+      {
+        const tNow = performance.now();
+        for (const sc of s.scraps) {
+          const px = sc.x * CELL - camX;
+          const py = sc.y * CELL - camY;
+          if (px < -CELL || py < -CELL || px > wViewW + CELL || py > wViewH + CELL) continue;
+          const age = tNow - sc.spawnedAt;
+          const fadeIn = Math.min(1, age / 250);
+          const lifeLeft = Math.max(0, 1 - Math.max(0, age - 27000) / 3000); // fade last 3s
+          const alpha = fadeIn * lifeLeft;
+          const phase = (sc.x * 12.9898 + sc.y * 78.233) % (Math.PI * 2);
+          const pulse = 0.5 + 0.5 * Math.sin(tNow / 260 + phase);
+          const r = CELL * 0.18 * (0.9 + 0.2 * pulse);
+          // glow
+          const grd = ctx.createRadialGradient(px, py, 0, px, py, r * 3.2);
+          grd.addColorStop(0, SCRAP_COLOR + "cc");
+          grd.addColorStop(0.5, SCRAP_COLOR + "44");
+          grd.addColorStop(1, SCRAP_COLOR + "00");
+          ctx.globalAlpha = 0.65 * alpha;
+          ctx.fillStyle = grd;
+          ctx.beginPath(); ctx.arc(px, py, r * 3.2, 0, Math.PI * 2); ctx.fill();
+          // body — jagged shard
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = SCRAP_COLOR;
+          ctx.strokeStyle = "rgba(255,236,180,0.9)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(px, py - r * 1.2);
+          ctx.lineTo(px + r * 0.9, py - r * 0.2);
+          ctx.lineTo(px + r * 0.5, py + r * 1.1);
+          ctx.lineTo(px - r * 0.7, py + r * 0.6);
+          ctx.lineTo(px - r * 0.8, py - r * 0.4);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+      }
+
+
 
       // ---- Obstacles: asteroids ----
       for (const o of s.obstacles) {
@@ -2329,6 +2412,15 @@ function Game() {
             {n}
           </span>
         ))}
+        {cost.scrap > 0 && (
+          <span
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px]"
+            style={{ backgroundColor: SCRAP_COLOR + "22", color: SCRAP_COLOR, border: `1px solid ${SCRAP_COLOR}55` }}
+          >
+            <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: SCRAP_COLOR }} />
+            {cost.scrap}
+          </span>
+        )}
       </span>
     );
   };
