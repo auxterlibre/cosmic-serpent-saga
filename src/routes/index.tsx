@@ -1958,9 +1958,9 @@ function Game() {
   };
 
   const UpgradeButton = ({
-    onClick, level, label, current, disabled, maxed,
-  }: { onClick: () => void; level: number; label: string; current: string; disabled?: boolean; maxed?: boolean }) => {
-    const cost = costFor(level);
+    onClick, level, label, current, disabled, maxed, kind = "fire",
+  }: { onClick: () => void; level: number; label: string; current: string; disabled?: boolean; maxed?: boolean; kind?: UpgradeKind }) => {
+    const cost = costFor(level, kind);
     const afford = canAfford(hud.inventory, cost);
     return (
       <button
