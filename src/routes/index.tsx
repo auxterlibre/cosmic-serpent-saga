@@ -1191,7 +1191,7 @@ function Game() {
       // ---- Wardens: slow heavy turret ships that shoot the player ----
       {
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = loot >= 12 ? 4 : loot >= 4 ? 3 : 2;
+        const desired = loot >= 12 ? 14 : loot >= 4 ? 11 : 8;
         if (s.wardens.length < desired) {
           for (let i = 0; i < desired - s.wardens.length; i++) {
             const pos = randPlayablePosAway(s.snake[0] ?? START);
