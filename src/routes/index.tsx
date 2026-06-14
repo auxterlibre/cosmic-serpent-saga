@@ -1115,47 +1115,95 @@ function Game() {
         ctx.rotate(ang);
 
         const tint = overCap && blinkOn ? "#ef4444" : seg.color;
-        const outline = overCap ? "#ef4444" : "#7df9ff";
-        const lw = overCap ? 1.6 : 1.1;
+        const outline = overCap ? "#ef4444" : "#e0ffff";
+        const lw = overCap ? 1.8 : 1.2;
 
-        // Crate body
-        ctx.fillStyle = "#0b1a2a";
+        // Helper: darken/lighten a hex color
+        const shade = (hex: string, amt: number) => {
+          const h = hex.replace("#", "");
+          const r = parseInt(h.slice(0, 2), 16);
+          const g = parseInt(h.slice(2, 4), 16);
+          const b = parseInt(h.slice(4, 6), 16);
+          const m = (v: number) => Math.max(0, Math.min(255, Math.round(v + amt)));
+          return `rgb(${m(r)},${m(g)},${m(b)})`;
+        };
+
+        // --- Solid metal crate body, painted in the cargo's rarity color ---
+        // Base plate (slightly darker shade for depth)
+        ctx.fillStyle = shade(tint, -55);
+        ctx.fillRect(-R, -R, R * 2, R * 2);
+
+        // Top-lit highlight band (sky-light from the ship's direction)
+        const grad = ctx.createLinearGradient(0, -R, 0, R);
+        grad.addColorStop(0, "rgba(255,255,255,0.28)");
+        grad.addColorStop(0.5, "rgba(255,255,255,0.05)");
+        grad.addColorStop(1, "rgba(0,0,0,0.35)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(-R, -R, R * 2, R * 2);
+
+        // Reinforced steel frame (matches ship's cyan outline)
         ctx.strokeStyle = outline;
         ctx.lineWidth = lw;
-        ctx.beginPath();
-        ctx.rect(-R, -R, R * 2, R * 2);
-        ctx.fill();
-        ctx.stroke();
+        ctx.strokeRect(-R, -R, R * 2, R * 2);
 
-        // Colored cargo stripe (rarity tint)
-        ctx.fillStyle = tint;
-        ctx.fillRect(-R, -R * 0.45, R * 2, R * 0.9);
-        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        // Inner panel inset — gives the crate physical thickness
+        ctx.strokeStyle = shade(tint, -90);
         ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(-R, -R * 0.45); ctx.lineTo(R, -R * 0.45);
-        ctx.moveTo(-R, R * 0.45); ctx.lineTo(R, R * 0.45);
-        ctx.stroke();
+        ctx.strokeRect(-R * 0.78, -R * 0.78, R * 1.56, R * 1.56);
 
-        // Corrugated panel lines
-        ctx.strokeStyle = "rgba(125,249,255,0.35)";
-        ctx.lineWidth = 0.6;
-        for (let k = -1; k <= 1; k += 1) {
-          if (k === 0) continue;
+        // Central cargo plate with hazard stripe band
+        ctx.fillStyle = shade(tint, -30);
+        ctx.fillRect(-R * 0.62, -R * 0.32, R * 1.24, R * 0.64);
+        ctx.strokeStyle = "rgba(0,0,0,0.55)";
+        ctx.lineWidth = 0.9;
+        ctx.strokeRect(-R * 0.62, -R * 0.32, R * 1.24, R * 0.64);
+
+        // Diagonal hazard hatching on the plate
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-R * 0.62, -R * 0.32, R * 1.24, R * 0.64);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 0.7;
+        for (let x = -R * 1.2; x <= R * 1.2; x += R * 0.22) {
           ctx.beginPath();
-          ctx.moveTo(k * R * 0.5, -R);
-          ctx.lineTo(k * R * 0.5, -R * 0.45);
-          ctx.moveTo(k * R * 0.5, R * 0.45);
-          ctx.lineTo(k * R * 0.5, R);
+          ctx.moveTo(x, -R);
+          ctx.lineTo(x + R, R);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // Side ridges (top + bottom corrugation, perpendicular to travel)
+        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        ctx.lineWidth = 0.7;
+        for (const yy of [-R * 0.6, -R * 0.45, R * 0.45, R * 0.6]) {
+          ctx.beginPath();
+          ctx.moveTo(-R * 0.85, yy);
+          ctx.lineTo(R * 0.85, yy);
+          ctx.stroke();
+        }
+        // Subtle metal sheen on top ridges
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 0.5;
+        for (const yy of [-R * 0.58, -R * 0.43]) {
+          ctx.beginPath();
+          ctx.moveTo(-R * 0.85, yy);
+          ctx.lineTo(R * 0.85, yy);
           ctx.stroke();
         }
 
-        // Corner rivets
-        ctx.fillStyle = outline;
-        const rv = R * 0.14;
+        // Corner bolts — chunky, with dark center to read as 3D
+        const rv = R * 0.16;
         for (const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]] as const) {
+          const bx = sx * (R - rv * 1.1);
+          const by = sy * (R - rv * 1.1);
+          ctx.fillStyle = shade(tint, -70);
           ctx.beginPath();
-          ctx.arc(sx * (R - rv * 1.2), sy * (R - rv * 1.2), rv * 0.55, 0, Math.PI * 2);
+          ctx.arc(bx, by, rv * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = outline;
+          ctx.beginPath();
+          ctx.arc(bx - rv * 0.18, by - rv * 0.18, rv * 0.32, 0, Math.PI * 2);
           ctx.fill();
         }
 
