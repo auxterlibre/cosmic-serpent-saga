@@ -976,7 +976,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
               s.alive = false;
-              setTimeout(syncHud, 900);
+              setTimeout(syncHud, 1500);
               return;
             } else if (hitIdx > 0) {
               // Grab the bitten segment AND every segment after it; they become the hunter's tail.
