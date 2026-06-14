@@ -21,8 +21,8 @@ const SEG_SPACING = 1.15;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
 const HUNTER_MIN = 1;
-const HUNTER_MAX = 10;
-const HUNTER_PER_LOOT = 1 / 3; // +1 hunter per 3 loot segments carried
+const HUNTER_MAX = 20;
+const HUNTER_PER_LOOT = 2 / 3; // +1 hunter per 1.5 loot segments carried
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
 
@@ -99,10 +99,22 @@ function isInsidePlayableArea(p: Vec, pad = 3): boolean {
   return dx > inner && dy > inner;
 }
 
-function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3): Vec {
-  for (let i = 0; i < 180; i++) {
+// Obstacles registered for spawn-avoidance (loot, checkpoints).
+let CURRENT_OBSTACLES: Obstacle[] = [];
+function clearOfObstacles(p: Vec, pad = 1.5): boolean {
+  for (const o of CURRENT_OBSTACLES) {
+    const r = o.size / 2 + pad;
+    const dx = p.x - o.x, dy = p.y - o.y;
+    if (dx * dx + dy * dy < r * r) return false;
+  }
+  return true;
+}
+
+function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8): Vec {
+  for (let i = 0; i < 220; i++) {
     const p = randPos();
     if (!isInsidePlayableArea(p, pad)) continue;
+    if (!clearOfObstacles(p, astPad)) continue;
     if (!from) return p;
     const dx = p.x - from.x, dy = p.y - from.y;
     if (dx * dx + dy * dy >= minDist * minDist) return p;
@@ -225,6 +237,10 @@ function makeCheckpoints(): Checkpoint[] {
       if (attempts > 4000) beltPad = Math.max(2, beltPad - 1);
       continue;
     }
+    if (!clearOfObstacles(c, 3)) {
+      if (attempts > 4000) { /* keep trying with reduced belt pad */ }
+      continue;
+    }
     const md2 = minDist * minDist;
     if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md2)) {
       cps.push(c);
@@ -252,22 +268,36 @@ function computeInventory(snake: Seg[], growth: string[]): Cost {
 }
 
 // Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
-// Costs ramp through rarities: common only -> + uncommon -> + rare -> + epic.
+// Costs ramp through rarities and scale steeply with level. Multi-shot is a
+// premium upgrade and requires rare loot from the first purchase.
 type Cost = Record<Rarity, number>;
-function costFor(level: number): Cost {
+type UpgradeKind = "fire" | "damage" | "range" | "multishot" | "speed" | "cap";
+function costFor(level: number, kind: UpgradeKind = "fire"): Cost {
   const c: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
-  // L1: 2 com
-  // L2: 3 com
-  // L3: 4 com + 1 unc
-  // L4: 4 com + 2 unc
-  // L5: 4 com + 3 unc + 1 rare
-  // L6: 5 com + 3 unc + 2 rare
-  // L7: 5 com + 4 unc + 2 rare + 1 epic
-  // ... general:
-  c.common = 1 + Math.min(5, level);
-  if (level >= 3) c.uncommon = 1 + Math.floor((level - 3) / 2);
-  if (level >= 5) c.rare = 1 + Math.floor((level - 5) / 2);
-  if (level >= 7) c.epic = 1 + Math.floor((level - 7) / 2);
+  if (kind === "multishot") {
+    // Premium: needs rare from L1, epic from L2.
+    // L1: 4 com + 2 unc + 1 rare
+    // L2: 6 com + 3 unc + 2 rare + 1 epic
+    // L3: 8 com + 4 unc + 3 rare + 2 epic
+    // L4: 10 com + 5 unc + 4 rare + 3 epic
+    c.common = 2 + level * 2;
+    c.uncommon = 1 + level;
+    c.rare = level;
+    c.epic = Math.max(0, level - 1);
+    return c;
+  }
+  // Inflated standard ramp (steeper than before).
+  // L1: 3 com
+  // L2: 5 com + 1 unc
+  // L3: 7 com + 2 unc
+  // L4: 9 com + 3 unc + 1 rare
+  // L5: 11 com + 4 unc + 2 rare
+  // L6: 13 com + 5 unc + 3 rare + 1 epic
+  // L7: 15 com + 6 unc + 4 rare + 2 epic
+  c.common = 1 + level * 2;
+  if (level >= 2) c.uncommon = level - 1;
+  if (level >= 4) c.rare = level - 3;
+  if (level >= 6) c.epic = level - 5;
   return c;
 }
 function canAfford(inv: Cost, cost: Cost): boolean {
@@ -275,13 +305,15 @@ function canAfford(inv: Cost, cost: Cost): boolean {
 }
 
 function initialState() {
+  const obstacles = makeObstacles();
+  CURRENT_OBSTACLES = obstacles;
   return {
     snake: initialSnake(),
     headAngle: 0,
     targetAngle: 0,
     growth: [] as string[],
+    obstacles,
     loot: makeLoot(),
-    obstacles: makeObstacles(),
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
@@ -486,7 +518,11 @@ function Game() {
 
   function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed" | "lvlCap", apply: () => void) {
     const s = stateRef.current;
-    const cost = costFor(s[lvlKey]);
+    const kindMap: Record<typeof lvlKey, UpgradeKind> = {
+      lvlFireRate: "fire", lvlDamage: "damage", lvlRange: "range",
+      lvlMultishot: "multishot", lvlSpeed: "speed", lvlCap: "cap",
+    };
+    const cost = costFor(s[lvlKey], kindMap[lvlKey]);
     const inv = computeInventory(s.snake, s.growth);
     if (!canAfford(inv, cost)) return;
     spendSegments(cost);
@@ -1922,9 +1958,9 @@ function Game() {
   };
 
   const UpgradeButton = ({
-    onClick, level, label, current, disabled, maxed,
-  }: { onClick: () => void; level: number; label: string; current: string; disabled?: boolean; maxed?: boolean }) => {
-    const cost = costFor(level);
+    onClick, level, label, current, disabled, maxed, kind = "fire",
+  }: { onClick: () => void; level: number; label: string; current: string; disabled?: boolean; maxed?: boolean; kind?: UpgradeKind }) => {
+    const cost = costFor(level, kind);
     const afford = canAfford(hud.inventory, cost);
     return (
       <button
@@ -2060,6 +2096,7 @@ function Game() {
                     label="Multi-target +1"
                     current={`Fires at ${hud.multishot} enem${hud.multishot > 1 ? "ies" : "y"} per volley`}
                     maxed={hud.multishot >= 6}
+                    kind="multishot"
                   />
                   <UpgradeButton
                     onClick={buySpeed}
