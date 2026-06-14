@@ -322,6 +322,19 @@ function Game() {
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const [started, setStarted] = useState(false);
   const [paused, setPaused] = useState(false);
+  const [flash, setFlash] = useState<Record<string, number>>({});
+  const flashRes = (keys: string[]) => {
+    const now = Date.now();
+    setFlash((f) => {
+      const next = { ...f };
+      for (const k of keys) next[k] = now;
+      return next;
+    });
+  };
+  const isFlashing = (k: string) => {
+    const t = flash[k];
+    return !!t && Date.now() - t < 620;
+  };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
