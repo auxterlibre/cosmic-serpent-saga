@@ -1145,14 +1145,14 @@ function Game() {
           ctx.lineTo(ax * armLen, ay * armLen);
           ctx.stroke();
           // cross-hatch ribs
-          ctx.strokeStyle = "rgba(156,163,175,0.55)";
+          ctx.strokeStyle = "rgba(122,125,133,0.55)";
           for (let k = 1; k < 3; k++) {
             const t = k / 3;
             const mx = ax * (r + (armLen - r) * t);
             const my = ay * (r + (armLen - r) * t);
             ctx.beginPath();
-            ctx.moveTo(mx - ay * 2, my + ax * 2);
-            ctx.lineTo(mx + ay * 2, my - ax * 2);
+            ctx.moveTo(mx - ay * 3, my + ax * 3);
+            ctx.lineTo(mx + ay * 3, my - ax * 3);
             ctx.stroke();
           }
           // module at the end — alternating tank / solar panel / antenna
