@@ -1027,7 +1027,6 @@ function Game() {
                   });
                 }
                 s.hunters.splice(i, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
                 syncHud();
               }
               return false;
