@@ -752,6 +752,9 @@ function Game() {
         const r = size / 2 * 0.72;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
+          const now = performance.now();
+          s.explosions.push({ x: hx, y: hy, t0: now });
+          s.explosions.push({ x: cx, y: cy, t0: now + 60 });
           s.alive = false;
           syncHud();
           return;
