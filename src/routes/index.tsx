@@ -99,10 +99,22 @@ function isInsidePlayableArea(p: Vec, pad = 3): boolean {
   return dx > inner && dy > inner;
 }
 
-function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3): Vec {
-  for (let i = 0; i < 180; i++) {
+// Obstacles registered for spawn-avoidance (loot, checkpoints).
+let CURRENT_OBSTACLES: Obstacle[] = [];
+function clearOfObstacles(p: Vec, pad = 1.5): boolean {
+  for (const o of CURRENT_OBSTACLES) {
+    const r = o.size / 2 + pad;
+    const dx = p.x - o.x, dy = p.y - o.y;
+    if (dx * dx + dy * dy < r * r) return false;
+  }
+  return true;
+}
+
+function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8): Vec {
+  for (let i = 0; i < 220; i++) {
     const p = randPos();
     if (!isInsidePlayableArea(p, pad)) continue;
+    if (!clearOfObstacles(p, astPad)) continue;
     if (!from) return p;
     const dx = p.x - from.x, dy = p.y - from.y;
     if (dx * dx + dy * dy >= minDist * minDist) return p;
