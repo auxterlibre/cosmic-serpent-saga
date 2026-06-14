@@ -330,6 +330,14 @@ function Game() {
       for (const k of keys) next[k] = now;
       return next;
     });
+    window.setTimeout(() => {
+      setFlash((f) => {
+        const next: Record<string, number> = {};
+        const cutoff = Date.now() - 620;
+        for (const k in f) if (f[k] > cutoff) next[k] = f[k];
+        return next;
+      });
+    }, 640);
   };
   const isFlashing = (k: string) => {
     const t = flash[k];
