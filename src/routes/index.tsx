@@ -852,7 +852,7 @@ function Game() {
             continue;
           }
 
-          if (h.cooldown <= 0) {
+          if (h.cooldown <= 0 && loot > 0) {
             const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
             const reach = (hsize + 0.4) * (hsize + 0.4);
             let hitIdx = -1;
