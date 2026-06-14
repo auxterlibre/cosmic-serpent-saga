@@ -199,6 +199,11 @@ function initialState() {
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(initialState());
+  if (typeof window !== "undefined") {
+    // Diagnostic: log every Game mount so we can see if the route is remounting unexpectedly.
+    // eslint-disable-next-line no-console
+    console.log("[Game] mount", new Date().toISOString());
+  }
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
@@ -1315,8 +1320,8 @@ function Game() {
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]">
-      <canvas ref={canvasRef} className="block touch-none" />
+    <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+      <canvas ref={canvasRef} className="block touch-none" style={{ touchAction: "none" }} />
 
       {started && hud.alive && !shop.open && (
         <button
