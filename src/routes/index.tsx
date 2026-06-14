@@ -1313,7 +1313,11 @@ function Game() {
       const ctx = c.getContext("2d");
       if (!ctx) return;
       const s = stateRef.current;
-      const head = s.snake[0] ?? { x: WORLD_W / 2, y: WORLD_H / 2 };
+      const liveHead = s.snake[0];
+      if (liveHead) { s.lastHeadX = liveHead.x; s.lastHeadY = liveHead.y; }
+      // Keep the camera anchored on the last known head position after death
+      // so the explosion stays on screen instead of snapping to world center.
+      const head = liveHead ?? { x: s.lastHeadX, y: s.lastHeadY };
 
       const viewW = c.width;
       const viewH = c.height;
