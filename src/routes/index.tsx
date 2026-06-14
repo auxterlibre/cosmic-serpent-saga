@@ -291,13 +291,15 @@ function canAfford(inv: Cost, cost: Cost): boolean {
 }
 
 function initialState() {
+  const obstacles = makeObstacles();
+  CURRENT_OBSTACLES = obstacles;
   return {
     snake: initialSnake(),
     headAngle: 0,
     targetAngle: 0,
     growth: [] as string[],
+    obstacles,
     loot: makeLoot(),
-    obstacles: makeObstacles(),
     hunters: makeHunters(),
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
