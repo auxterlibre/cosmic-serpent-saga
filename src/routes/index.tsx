@@ -206,7 +206,7 @@ function makeObstacles(): Obstacle[] {
   return list;
 }
 function makeHunters(): Hunter[] {
-  return Array.from({ length: HUNTER_MIN }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null }));
+  return [];
 }
 function makeCheckpoints(): Checkpoint[] {
   const cps: Checkpoint[] = [];
@@ -316,7 +316,8 @@ function initialState() {
 
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const stateRef = useRef(initialState());
+  const [initialGameState] = useState(() => initialState());
+  const stateRef = useRef(initialGameState);
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
