@@ -237,6 +237,10 @@ function makeCheckpoints(): Checkpoint[] {
       if (attempts > 4000) beltPad = Math.max(2, beltPad - 1);
       continue;
     }
+    if (!clearOfObstacles(c, 3)) {
+      if (attempts > 4000) { /* keep trying with reduced belt pad */ }
+      continue;
+    }
     const md2 = minDist * minDist;
     if (cps.every((o) => (o.x - c.x) ** 2 + (o.y - c.y) ** 2 >= md2)) {
       cps.push(c);
