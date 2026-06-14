@@ -934,13 +934,12 @@ function Game() {
               if (ddx * ddx + ddy * ddy <= reach) { hitIdx = i; break; }
             }
             if (hitIdx === 0) {
-              // A hunter bumping the ship should not end the run; only cargo can be stolen.
-              h.cooldown = 650;
-              h.fleeing = true;
-              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
-              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
-              h.fleeTarget = { x: ex, y: ey };
-              continue;
+              // Ramming the ship destroys both the hunter and the player.
+              const idx = s.hunters.indexOf(h);
+              if (idx >= 0) s.hunters.splice(idx, 1);
+              s.alive = false;
+              syncHud();
+              return;
             } else if (hitIdx > 0) {
               // Grab the bitten segment AND every segment after it; they become the hunter's tail.
               const taken = s.snake.splice(hitIdx);
