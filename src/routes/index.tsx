@@ -1270,8 +1270,12 @@ function Game() {
 
         // $ tag floating just above the hub (un-rotated for readability)
         ctx.fillStyle = "#fde68a";
-        ctx.font = "bold 9px monospace";
-        ctx.fillText("$", cx - 2.5, cy + 3.5);
+        ctx.font = "bold 16px monospace";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("$", cx, cy + 0.5);
+        ctx.textAlign = "start";
+        ctx.textBaseline = "alphabetic";
       }
 
       // ---- Loot: crystal shards with VFX ----
@@ -1374,13 +1378,19 @@ function Game() {
         // deterministic outline from position hash
         const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
         const points = 16 + (seed % 5);
-        // subtle copper-vs-slate tint per asteroid
+        // smooth tint between slate and copper per asteroid
         const tintRoll = (seed % 1000) / 1000;
-        const copper = tintRoll < 0.35; // ~35% lean copper
-        const baseFill = copper ? "#4a3a2e" : "#3a3a48";
-        const strokeC = copper ? "#c79778" : "#c0c0d0";
-        const craterC = copper ? "#2a1f17" : "#22222c";
-        const highlightC = copper ? "rgba(255,200,150,0.08)" : "rgba(255,255,255,0.06)";
+        // bias slightly toward slate, but cover the full range
+        const t = Math.pow(tintRoll, 1.1);
+        const lerp = (a: number, b: number, k: number) => Math.round(a + (b - a) * k);
+        const mix = (c1: [number, number, number], c2: [number, number, number]) =>
+          `rgb(${lerp(c1[0], c2[0], t)},${lerp(c1[1], c2[1], t)},${lerp(c1[2], c2[2], t)})`;
+        const mixA = (c1: [number, number, number], c2: [number, number, number], a: number) =>
+          `rgba(${lerp(c1[0], c2[0], t)},${lerp(c1[1], c2[1], t)},${lerp(c1[2], c2[2], t)},${a})`;
+        const baseFill = mix([58, 58, 72], [74, 58, 46]);
+        const strokeC = mix([192, 192, 208], [199, 151, 120]);
+        const craterC = mix([34, 34, 44], [42, 31, 23]);
+        const highlightC = mixA([255, 255, 255], [255, 200, 150], 0.07);
         ctx.fillStyle = baseFill;
         ctx.strokeStyle = strokeC;
         ctx.lineWidth = 1.25;
