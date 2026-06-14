@@ -777,11 +777,11 @@ function Game() {
 
         // Scale hunter count with loot carried (excluding the head/ship segment).
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, HUNTER_MIN + Math.floor(loot * HUNTER_PER_LOOT)));
+        const desired = loot <= 0 ? 0 : Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, Math.ceil(loot * HUNTER_PER_LOOT)));
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
-            s.hunters.push({ ...randPosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+            s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
           }
         } else if (activeCount > desired) {
           let toRemove = activeCount - desired;
@@ -901,7 +901,7 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
-                s.hunters.push({ ...randPosAway(s.snake[0]), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+                s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
               }
             }
             continue;
