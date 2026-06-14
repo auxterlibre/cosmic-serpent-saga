@@ -1079,13 +1079,22 @@ function Game() {
           // Find up to `multishot` distinct nearest hunters in range, then fire one
           // aimed (lead-predicted) projectile at EACH. No spread — every shot tracks
           // a real enemy so multi-shot becomes multi-target.
-          type Cand = { h: Hunter; d2: number };
+          type Cand = { x: number; y: number; vx: number; vy: number; d2: number };
           const cands: Cand[] = [];
           for (const h of s.hunters) {
             const dx = (h.x + 0.5) - head.x;
             const dy = (h.y + 0.5) - head.y;
             const d2 = dx * dx + dy * dy;
-            if (d2 <= rangeSq) cands.push({ h, d2 });
+            if (d2 <= rangeSq) {
+              const sp = HUNTER_SPEED * (h.fleeing ? 1.15 : 1);
+              cands.push({ x: h.x + 0.5, y: h.y + 0.5, vx: Math.cos(h.angle) * sp, vy: Math.sin(h.angle) * sp, d2 });
+            }
+          }
+          for (const w of s.wardens) {
+            const dx = (w.x + 0.5) - head.x;
+            const dy = (w.y + 0.5) - head.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 <= rangeSq) cands.push({ x: w.x + 0.5, y: w.y + 0.5, vx: 0, vy: 0, d2 });
           }
           if (cands.length > 0) {
             cands.sort((a, b) => a.d2 - b.d2);
