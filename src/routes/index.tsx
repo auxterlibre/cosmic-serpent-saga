@@ -1068,25 +1068,25 @@ function Game() {
 
       // ---- Obstacles: asteroids ----
       for (const o of s.obstacles) {
-        const size = 2;
+        const size = o.size;
         const px = o.x * CELL - camX;
         const py = o.y * CELL - camY;
-        if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
+        const pad = size * CELL;
+        if (px < -pad || py < -pad || px > wViewW + pad || py > wViewH + pad) continue;
         const cx = px + size * CELL / 2;
         const cy = py + size * CELL / 2;
-        const baseR = size * CELL / 2 - 2;
+        const baseR = size * CELL / 2 - 1;
         // deterministic jagged outline from position hash
-        const seed = ((o.x * 73856093) ^ (o.y * 19349663)) >>> 0;
-        const points = 11;
+        const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
+        const points = 11 + (seed % 5);
         ctx.fillStyle = "#3a3a48";
         ctx.strokeStyle = "#c0c0d0";
         ctx.lineWidth = 1.25;
         ctx.beginPath();
         for (let i = 0; i < points; i++) {
           const a = (i / points) * Math.PI * 2;
-          // pseudo-random radius variance per vertex
           const h = ((seed * (i + 1) * 2654435761) >>> 0) % 1000 / 1000;
-          const r = baseR * (0.72 + h * 0.28);
+          const r = baseR * (0.7 + h * 0.32);
           const x = cx + Math.cos(a) * r;
           const y = cy + Math.sin(a) * r;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -1094,14 +1094,20 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        // craters
+        // shaded inner highlight for volume
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.beginPath();
+        ctx.arc(cx - baseR * 0.25, cy - baseR * 0.25, baseR * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        // craters (count scales with size)
         ctx.fillStyle = "#22222c";
-        for (let i = 0; i < 3; i++) {
+        const craters = Math.max(3, Math.floor(size * 1.5));
+        for (let i = 0; i < craters; i++) {
           const h1 = ((seed * (i + 7) * 40503) >>> 0) % 1000 / 1000;
           const h2 = ((seed * (i + 13) * 90089) >>> 0) % 1000 / 1000;
-          const cr = 1.5 + h1 * 2;
+          const cr = 1.5 + h1 * (size * 0.9);
           const ang = h2 * Math.PI * 2;
-          const dist = baseR * 0.45 * h1;
+          const dist = baseR * 0.55 * h1;
           ctx.beginPath();
           ctx.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, cr, 0, Math.PI * 2);
           ctx.fill();
