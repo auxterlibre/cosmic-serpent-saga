@@ -225,7 +225,7 @@ function Game() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "r" || e.key === "R") { reset(); return; }
+      if ((e.key === "r" || e.key === "R") && (e.shiftKey || e.ctrlKey || e.metaKey) && !stateRef.current.alive) { reset(); return; }
       if (e.key === "Escape") { closeShop(); return; }
       if (e.key === "p" || e.key === "P") { togglePause(); return; }
       if (KEY_DIR[e.key]) stateRef.current.keys.add(e.key);
