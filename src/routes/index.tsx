@@ -1576,6 +1576,7 @@ function Game() {
         const DUR = 520;
         s.explosions = s.explosions.filter((e) => nowE - e.t0 < DUR);
         for (const e of s.explosions) {
+          if (nowE < e.t0) continue; // not yet
           const t = (nowE - e.t0) / DUR; // 0..1
           const ex = e.x * CELL - camX;
           const ey = e.y * CELL - camY;
