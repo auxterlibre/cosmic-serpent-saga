@@ -111,11 +111,20 @@ function clearOfObstacles(p: Vec, pad = 1.5): boolean {
   return true;
 }
 
-function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8): Vec {
+const LOOT_MIN_SPACING = 4;
+function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
   for (let i = 0; i < 220; i++) {
     const p = randPos();
     if (!isInsidePlayableArea(p, pad)) continue;
     if (!clearOfObstacles(p, astPad)) continue;
+    if (avoidLoot) {
+      let ok = true;
+      for (const q of avoidLoot) {
+        const ddx = p.x - q.x, ddy = p.y - q.y;
+        if (ddx * ddx + ddy * ddy < LOOT_MIN_SPACING * LOOT_MIN_SPACING) { ok = false; break; }
+      }
+      if (!ok) continue;
+    }
     if (!from) return p;
     const dx = p.x - from.x, dy = p.y - from.y;
     if (dx * dx + dy * dy >= minDist * minDist) return p;
@@ -130,7 +139,11 @@ const OVER_CAP_MS = 5000;
 // Player spawns near (but not on top of) the central checkpoint.
 const START: Vec = { x: WORLD_W / 2 + 6, y: WORLD_H / 2 + 4 };
 
-function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
+function makeLoot(): Colored[] {
+  const out: Colored[] = [];
+  for (let i = 0; i < LOOT_COUNT; i++) out.push(makeLootItem(0, START, out));
+  return out;
+}
 // Returns the inner edge distance from the world boundary at world coords (x,y).
 // The belt occupies the band between the world edge and this inner edge.
 // Corners are rounded inward so the playable area is a rounded rectangle.
