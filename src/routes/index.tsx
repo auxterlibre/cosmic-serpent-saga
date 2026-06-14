@@ -1269,11 +1269,19 @@ function Game() {
         ctx.restore();
 
         // $ tag floating just above the hub (un-rotated for readability)
-        ctx.fillStyle = "#fde68a";
-        ctx.font = "bold 16px monospace";
+        ctx.font = "bold 24px monospace";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
+        ctx.shadowColor = "rgba(253,224,71,0.9)";
+        ctx.shadowBlur = 10;
+        ctx.fillStyle = "#1a1408";
+        ctx.fillText("$", cx + 1, cy + 1.5);
+        ctx.fillStyle = "#fde047";
         ctx.fillText("$", cx, cy + 0.5);
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = "rgba(120,80,10,0.9)";
+        ctx.lineWidth = 1.2;
+        ctx.strokeText("$", cx, cy + 0.5);
         ctx.textAlign = "start";
         ctx.textBaseline = "alphabetic";
       }
