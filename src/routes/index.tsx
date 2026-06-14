@@ -282,8 +282,8 @@ function initialSnake(): Seg[] {
   return [{ x: START.x, y: START.y, color: SEG_COLOR_DEFAULT }];
 }
 
-function computeInventory(snake: Seg[], growth: string[]): Cost {
-  const inv: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+function computeInventory(snake: Seg[], growth: string[], scrap = 0): Cost {
+  const inv: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0, scrap };
   const tally = (color: string) => {
     for (const r of RARITY_ORDER) {
       if (RARITY_INFO[r].color === color) { inv[r]++; return; }
@@ -297,38 +297,28 @@ function computeInventory(snake: Seg[], growth: string[]): Cost {
 // Upgrade cost formula: takes a level (1 = first purchase) and returns a rarity cost map.
 // Costs ramp through rarities and scale steeply with level. Multi-shot is a
 // premium upgrade and requires rare loot from the first purchase.
-type Cost = Record<Rarity, number>;
+type Cost = { common: number; uncommon: number; rare: number; epic: number; scrap: number };
 type UpgradeKind = "fire" | "damage" | "range" | "multishot" | "speed" | "cap";
+function emptyCost(): Cost { return { common: 0, uncommon: 0, rare: 0, epic: 0, scrap: 0 }; }
 function costFor(level: number, kind: UpgradeKind = "fire"): Cost {
-  const c: Cost = { common: 0, uncommon: 0, rare: 0, epic: 0 };
+  const c: Cost = emptyCost();
   if (kind === "multishot") {
-    // Premium: needs rare from L1, epic from L2.
-    // L1: 4 com + 2 unc + 1 rare
-    // L2: 6 com + 3 unc + 2 rare + 1 epic
-    // L3: 8 com + 4 unc + 3 rare + 2 epic
-    // L4: 10 com + 5 unc + 4 rare + 3 epic
     c.common = 2 + level * 2;
     c.uncommon = 1 + level;
     c.rare = level;
     c.epic = Math.max(0, level - 1);
+    c.scrap = 15 + level * 10;
     return c;
   }
-  // Inflated standard ramp (steeper than before).
-  // L1: 3 com
-  // L2: 5 com + 1 unc
-  // L3: 7 com + 2 unc
-  // L4: 9 com + 3 unc + 1 rare
-  // L5: 11 com + 4 unc + 2 rare
-  // L6: 13 com + 5 unc + 3 rare + 1 epic
-  // L7: 15 com + 6 unc + 4 rare + 2 epic
   c.common = 1 + level * 2;
   if (level >= 2) c.uncommon = level - 1;
   if (level >= 4) c.rare = level - 3;
   if (level >= 6) c.epic = level - 5;
+  c.scrap = 5 + level * 5;
   return c;
 }
 function canAfford(inv: Cost, cost: Cost): boolean {
-  return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic;
+  return inv.common >= cost.common && inv.uncommon >= cost.uncommon && inv.rare >= cost.rare && inv.epic >= cost.epic && inv.scrap >= cost.scrap;
 }
 
 function initialState() {
