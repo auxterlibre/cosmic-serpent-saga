@@ -1614,6 +1614,50 @@ function Game() {
         }
       }
 
+      // ---- Asteroid debris chunks ----
+      {
+        const nowD = performance.now();
+        const DDUR = 1500;
+        s.debris = s.debris.filter((d) => nowD - d.t0 < DDUR);
+        for (const d of s.debris) {
+          const t = (nowD - d.t0) / DDUR;
+          // simple physics: drift outward, slow rotation, slight drag
+          const drag = Math.pow(0.985, (nowD - d.t0) / 16);
+          const wx = d.x + d.vx * (nowD - d.t0) / 1000 * 0.9 * drag;
+          const wy = d.y + d.vy * (nowD - d.t0) / 1000 * 0.9 * drag;
+          const px = wx * CELL - camX;
+          const py = wy * CELL - camY;
+          if (px < -60 || py < -60 || px > wViewW + 60 || py > wViewH + 60) continue;
+          const alpha = Math.max(0, 1 - Math.pow(t, 1.6));
+          const baseR = d.size * CELL / 2;
+          const rot = d.rot + d.vr * t;
+          ctx.save();
+          ctx.translate(px, py);
+          ctx.rotate(rot);
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = d.baseFill;
+          ctx.beginPath();
+          const pts = 7;
+          for (let i = 0; i <= pts; i++) {
+            const a = (i / pts) * Math.PI * 2;
+            const h = ((d.seed * (i + 1) * 2654435761) >>> 0) % 1000 / 1000;
+            const r = baseR * (0.7 + h * 0.4);
+            const x = Math.cos(a) * r;
+            const y = Math.sin(a) * r;
+            if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+          }
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = d.craterC;
+          ctx.beginPath();
+          ctx.arc(baseR * 0.2, baseR * 0.2, baseR * 0.25, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+          ctx.globalAlpha = 1;
+        }
+      }
+
+
       // ---- Pickups: collection feedback (growing diamond stroke, fading out) ----
       {
         const nowP = performance.now();
