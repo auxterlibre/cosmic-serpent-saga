@@ -36,6 +36,7 @@ type Projectile = { x: number; y: number; vx: number; vy: number; life: number }
 type Checkpoint = { x: number; y: number };
 type Seg = { x: number; y: number; color: string; overCapUntil?: number };
 type Explosion = { x: number; y: number; t0: number };
+type Debris = { x: number; y: number; vx: number; vy: number; rot: number; vr: number; size: number; t0: number; seed: number; baseFill: string; craterC: string };
 type Pickup = { x: number; y: number; t0: number; color: string; value: number; rarity: Rarity };
 
 const KEY_DIR: Record<string, { x: number; y: number }> = {
@@ -293,6 +294,7 @@ function initialState() {
     checkpoints: makeCheckpoints(),
     projectiles: [] as Projectile[],
     explosions: [] as Explosion[],
+    debris: [] as Debris[],
     pickups: [] as Pickup[],
     alive: true,
     score: 0,
