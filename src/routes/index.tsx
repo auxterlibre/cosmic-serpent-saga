@@ -889,7 +889,7 @@ function Game() {
 
         // Scale hunter count with loot carried (excluding the head/ship segment).
         const loot = Math.max(0, s.snake.length - 1);
-        const desired = loot <= 0 ? 0 : Math.max(HUNTER_MIN, Math.min(HUNTER_MAX, Math.ceil(loot * HUNTER_PER_LOOT)));
+        const desired = Math.min(HUNTER_MAX, 5 + Math.ceil(loot * HUNTER_PER_LOOT));
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
