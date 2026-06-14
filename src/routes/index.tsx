@@ -997,12 +997,25 @@ function Game() {
             tx = h.fleeTarget.x + 0.5;
             ty = h.fleeTarget.y + 0.5;
           } else if (loot <= 0) {
-            // No loot to steal — wander instead of hunting the player.
-            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
-              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+            // No player cargo to steal — go after nearest loot in the world.
+            let bestD = Infinity;
+            let bx = 0, by = 0;
+            for (const l of s.loot) {
+              const ddx = (l.x + 0.5) - (h.x + 0.5);
+              const ddy = (l.y + 0.5) - (h.y + 0.5);
+              const d = ddx * ddx + ddy * ddy;
+              if (d < bestD) { bestD = d; bx = l.x + 0.5; by = l.y + 0.5; }
             }
-            tx = h.wanderTarget.x;
-            ty = h.wanderTarget.y;
+            if (bestD === Infinity) {
+              if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+                h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+              }
+              tx = h.wanderTarget.x;
+              ty = h.wanderTarget.y;
+            } else {
+              h.wanderTarget = null;
+              tx = bx; ty = by;
+            }
           } else {
             h.wanderTarget = null;
             let bestD = Infinity;
