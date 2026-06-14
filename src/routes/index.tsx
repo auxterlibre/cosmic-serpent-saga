@@ -297,11 +297,6 @@ function initialState() {
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stateRef = useRef(initialState());
-  if (typeof window !== "undefined") {
-    // Diagnostic: log every Game mount so we can see if the route is remounting unexpectedly.
-    // eslint-disable-next-line no-console
-    console.log("[Game] mount", new Date().toISOString());
-  }
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
@@ -689,7 +684,10 @@ function Game() {
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
-        const r = size / 2 + 0.2;
+        // Tight hitbox: asteroid silhouette is jagged (vertices at 0.7–1.02 of
+        // the bounding radius). Use a radius near the inner trough so the
+        // player only dies when actually touching the visible rock.
+        const r = size / 2 * 0.72;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
           s.alive = false;
