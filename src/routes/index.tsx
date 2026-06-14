@@ -28,7 +28,7 @@ type Rarity = "common" | "uncommon" | "rare" | "epic";
 type Vec = { x: number; y: number };
 type Colored = { x: number; y: number; color: string; rarity: Rarity };
 
-type Obstacle = { x: number; y: number };
+type Obstacle = { x: number; y: number; size: number };
 type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
@@ -95,8 +95,41 @@ const OVER_CAP_MS = 5000;
 const START: Vec = { x: 50, y: 50 };
 
 function makeLoot(): Colored[] { return Array.from({ length: LOOT_COUNT }, () => makeLootItem(0, START)); }
+// Asteroid size variations (in cells).
+const ASTEROID_SIZES = [2.2, 3, 3, 4, 5];
+function pickAsteroidSize(): number {
+  return ASTEROID_SIZES[rand(ASTEROID_SIZES.length)];
+}
 function makeObstacles(): Obstacle[] {
-  return Array.from({ length: OBSTACLE_COUNT }, () => ({ ...randPosAway(START) }));
+  const list: Obstacle[] = [];
+  // Scattered field asteroids
+  for (let i = 0; i < OBSTACLE_COUNT; i++) {
+    const p = randPosAway(START);
+    // keep field asteroids away from the belt band
+    const margin = 7;
+    const x = Math.min(WORLD_W - margin, Math.max(margin, p.x));
+    const y = Math.min(WORLD_H - margin, Math.max(margin, p.y));
+    list.push({ x, y, size: pickAsteroidSize() });
+  }
+  // Asteroid belt around the world boundaries
+  const BELT_BAND = 5; // band thickness in cells from each edge
+  const BELT_DENSITY = 0.18; // asteroids per cell along the perimeter
+  const perimeter = 2 * (WORLD_W + WORLD_H);
+  const beltCount = Math.floor(perimeter * BELT_DENSITY);
+  for (let i = 0; i < beltCount; i++) {
+    const edge = rand(4);
+    let x = 0, y = 0;
+    const t = Math.random();
+    const band = Math.random() * BELT_BAND;
+    if (edge === 0) { x = t * WORLD_W; y = band; }
+    else if (edge === 1) { x = t * WORLD_W; y = WORLD_H - band; }
+    else if (edge === 2) { x = band; y = t * WORLD_H; }
+    else { x = WORLD_W - band; y = t * WORLD_H; }
+    // bigger, chunkier rocks in the belt
+    const size = Math.random() < 0.35 ? 5 + Math.random() * 2 : 3 + Math.random() * 2;
+    list.push({ x, y, size });
+  }
+  return list;
 }
 function makeHunters(): Hunter[] {
   return Array.from({ length: HUNTER_COUNT }, () => ({ ...randPosAway(START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null }));
@@ -586,12 +619,12 @@ function Game() {
 
       for (let i = s.obstacles.length - 1; i >= 0; i--) {
         const o = s.obstacles[i];
-        const size = 2;
+        const size = o.size;
         const cx = o.x + size / 2;
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
-        const r = size / 2 + 0.3;
+        const r = size / 2 + 0.2;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
           s.alive = false;
@@ -1035,25 +1068,25 @@ function Game() {
 
       // ---- Obstacles: asteroids ----
       for (const o of s.obstacles) {
-        const size = 2;
+        const size = o.size;
         const px = o.x * CELL - camX;
         const py = o.y * CELL - camY;
-        if (px < -CELL * 2 || py < -CELL * 2 || px > wViewW || py > wViewH) continue;
+        const pad = size * CELL;
+        if (px < -pad || py < -pad || px > wViewW + pad || py > wViewH + pad) continue;
         const cx = px + size * CELL / 2;
         const cy = py + size * CELL / 2;
-        const baseR = size * CELL / 2 - 2;
+        const baseR = size * CELL / 2 - 1;
         // deterministic jagged outline from position hash
-        const seed = ((o.x * 73856093) ^ (o.y * 19349663)) >>> 0;
-        const points = 11;
+        const seed = (((Math.floor(o.x * 100)) * 73856093) ^ ((Math.floor(o.y * 100)) * 19349663)) >>> 0;
+        const points = 11 + (seed % 5);
         ctx.fillStyle = "#3a3a48";
         ctx.strokeStyle = "#c0c0d0";
         ctx.lineWidth = 1.25;
         ctx.beginPath();
         for (let i = 0; i < points; i++) {
           const a = (i / points) * Math.PI * 2;
-          // pseudo-random radius variance per vertex
           const h = ((seed * (i + 1) * 2654435761) >>> 0) % 1000 / 1000;
-          const r = baseR * (0.72 + h * 0.28);
+          const r = baseR * (0.7 + h * 0.32);
           const x = cx + Math.cos(a) * r;
           const y = cy + Math.sin(a) * r;
           if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -1061,14 +1094,20 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        // craters
+        // shaded inner highlight for volume
+        ctx.fillStyle = "rgba(255,255,255,0.06)";
+        ctx.beginPath();
+        ctx.arc(cx - baseR * 0.25, cy - baseR * 0.25, baseR * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        // craters (count scales with size)
         ctx.fillStyle = "#22222c";
-        for (let i = 0; i < 3; i++) {
+        const craters = Math.max(3, Math.floor(size * 1.5));
+        for (let i = 0; i < craters; i++) {
           const h1 = ((seed * (i + 7) * 40503) >>> 0) % 1000 / 1000;
           const h2 = ((seed * (i + 13) * 90089) >>> 0) % 1000 / 1000;
-          const cr = 1.5 + h1 * 2;
+          const cr = 1.5 + h1 * (size * 0.9);
           const ang = h2 * Math.PI * 2;
-          const dist = baseR * 0.45 * h1;
+          const dist = baseR * 0.55 * h1;
           ctx.beginPath();
           ctx.arc(cx + Math.cos(ang) * dist, cy + Math.sin(ang) * dist, cr, 0, Math.PI * 2);
           ctx.fill();
