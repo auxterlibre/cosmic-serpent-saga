@@ -25,6 +25,13 @@ const HUNTER_MAX = 20;
 const HUNTER_PER_LOOT = 2 / 3; // +1 hunter per 1.5 loot segments carried
 const HUNTER_SPEED = 4.6;
 const CHECKPOINT_COUNT = 5;
+// Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
+const WARDEN_SPEED = 2.0;
+const WARDEN_HP = 8;
+const WARDEN_FIRE_INTERVAL = 2200;
+const WARDEN_SHOT_SPEED = 16; // slower than player's 45 so shots can be dodged
+const WARDEN_PREFERRED_DIST = 12;
+const WARDEN_FIRE_RANGE = 26;
 
 type Rarity = "common" | "uncommon" | "rare" | "epic";
 type Vec = { x: number; y: number };
