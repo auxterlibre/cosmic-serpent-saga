@@ -1750,6 +1750,104 @@ function Game() {
         ctx.restore();
       }
 
+      // ---- Wardens: heavy turret ships ----
+      for (const w of s.wardens) {
+        const cx = w.x * CELL + CELL / 2 - camX;
+        const cy = w.y * CELL + CELL / 2 - camY;
+        if (cx < -CELL * 6 || cy < -CELL * 6 || cx > wViewW + CELL * 6 || cy > wViewH + CELL * 6) continue;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(w.angle);
+        const R = CELL * 1.1;
+        // outer hull glow
+        const hullGlow = ctx.createRadialGradient(0, 0, R * 0.4, 0, 0, R * 1.6);
+        hullGlow.addColorStop(0, "rgba(180, 40, 40, 0.45)");
+        hullGlow.addColorStop(1, "rgba(180, 40, 40, 0)");
+        ctx.fillStyle = hullGlow;
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 1.6, 0, Math.PI * 2);
+        ctx.fill();
+        // armored hull (hex-ish chunk)
+        ctx.fillStyle = "#4b1f1f";
+        ctx.strokeStyle = "#fca5a5";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(R, 0);
+        ctx.lineTo(R * 0.55, R * 0.85);
+        ctx.lineTo(-R * 0.7, R * 0.95);
+        ctx.lineTo(-R, 0);
+        ctx.lineTo(-R * 0.7, -R * 0.95);
+        ctx.lineTo(R * 0.55, -R * 0.85);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        // armor plates
+        ctx.fillStyle = "#7f1d1d";
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.55, 0, Math.PI * 2);
+        ctx.fill();
+        // central turret base
+        ctx.fillStyle = "#1f1f23";
+        ctx.beginPath();
+        ctx.arc(0, 0, R * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+        // cannon barrel
+        ctx.fillStyle = "#d1d5db";
+        ctx.strokeStyle = "#0a0a0a";
+        ctx.lineWidth = 1;
+        ctx.fillRect(0, -R * 0.16, R * 1.05, R * 0.32);
+        ctx.strokeRect(0, -R * 0.16, R * 1.05, R * 0.32);
+        // muzzle glow
+        const mg = ctx.createRadialGradient(R * 1.05, 0, 0, R * 1.05, 0, R * 0.5);
+        mg.addColorStop(0, "rgba(255, 120, 60, 0.7)");
+        mg.addColorStop(1, "rgba(255, 80, 0, 0)");
+        ctx.fillStyle = mg;
+        ctx.beginPath();
+        ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
+        ctx.fill();
+        // HP pip ring
+        ctx.restore();
+        const hpFrac = Math.max(0, w.hp / WARDEN_HP);
+        ctx.strokeStyle = "rgba(20,20,30,0.7)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpFrac);
+        ctx.stroke();
+      }
+
+      // ---- Warden shots: chunky orange plasma ----
+      for (const p of s.wardenShots) {
+        const px = p.x * CELL - camX;
+        const py = p.y * CELL - camY;
+        const sp = Math.hypot(p.vx, p.vy) || 1;
+        const tx = px - (p.vx / sp) * CELL * 1.1;
+        const ty = py - (p.vy / sp) * CELL * 1.1;
+        const glow = ctx.createRadialGradient(px, py, 0, px, py, 18);
+        glow.addColorStop(0, "rgba(255, 140, 60, 0.85)");
+        glow.addColorStop(1, "rgba(255, 60, 0, 0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(px, py, 18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "rgba(255, 150, 70, 0.95)";
+        ctx.lineWidth = 4;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(tx, ty);
+        ctx.lineTo(px, py);
+        ctx.stroke();
+        ctx.fillStyle = "#fff7ed";
+        ctx.beginPath();
+        ctx.arc(px, py, 3.6, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+
       // ---- Projectiles: bright tracer rounds with motion trail ----
       for (const p of s.projectiles) {
         const px = p.x * CELL - camX;
