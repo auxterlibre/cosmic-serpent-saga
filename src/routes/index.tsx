@@ -1886,15 +1886,15 @@ function Game() {
                         key={from}
                         onClick={() => tryCraft(from)}
                         disabled={!afford}
-                        className="w-full rounded bg-fuchsia-500/10 px-3 py-2 text-left text-sm hover:bg-fuchsia-500/20 disabled:opacity-40"
+                        className="w-full rounded bg-fuchsia-500/10 px-3 py-2 text-left text-sm transition-transform duration-75 hover:bg-fuchsia-500/20 active:scale-[0.97] active:brightness-125 disabled:opacity-40 disabled:active:scale-100"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <span className="flex items-center gap-1">
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: fromInfo.color }} />
-                            <span style={{ color: fromInfo.color }}>{CRAFT_COST} {from}</span>
+                            <span className={isFlashing(from) ? "res-blink inline-block" : "inline-block"} style={{ color: fromInfo.color }}>{CRAFT_COST} {from}</span>
                             <span className="opacity-60">→</span>
                             <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: toInfo.color }} />
-                            <span style={{ color: toInfo.color }}>1 {to}</span>
+                            <span className={isFlashing(to) ? "res-blink inline-block" : "inline-block"} style={{ color: toInfo.color }}>1 {to}</span>
                           </span>
                           <span className="text-[11px] opacity-60">have {have}</span>
                         </div>
