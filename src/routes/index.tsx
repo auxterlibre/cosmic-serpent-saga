@@ -1808,7 +1808,7 @@ function Game() {
 
             <div className="mt-3 flex flex-wrap gap-2 text-xs">
               {RARITY_ORDER.map((r) => (
-                <span key={r} className={`inline-flex items-center gap-1 rounded px-2 py-1 transition-transform ${isFlashing(r) ? "res-blink" : ""}`}
+                <span key={`${r}-${flash[r] ?? 0}`} className={`inline-flex items-center gap-1 rounded px-2 py-1 ${isFlashing(r) ? "res-blink" : ""}`}
                   style={{ backgroundColor: RARITY_INFO[r].color + "1f", border: `1px solid ${RARITY_INFO[r].color}55`, color: RARITY_INFO[r].color }}>
                   <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: RARITY_INFO[r].color }} />
                   {r}: {hud.inventory[r]}
