@@ -126,17 +126,32 @@ function pickAsteroidSize(): number {
 }
 function makeObstacles(): Obstacle[] {
   const list: Obstacle[] = [];
+  // Gap between asteroid edges (in cells). Negative would allow overlap.
+  const GAP = 0.15;
+  const fits = (px: number, py: number, size: number): boolean => {
+    const r = size / 2;
+    for (const o of list) {
+      const minD = r + o.size / 2 + GAP;
+      const ddx = px - o.x;
+      const ddy = py - o.y;
+      if (ddx * ddx + ddy * ddy < minD * minD) return false;
+    }
+    return true;
+  };
   // Scattered field asteroids (kept inside the playable area, away from belt)
   for (let i = 0; i < OBSTACLE_COUNT; i++) {
-    let p = randPosAway(START);
-    for (let tries = 0; tries < 20; tries++) {
+    let placed = false;
+    for (let tries = 0; tries < 80 && !placed; tries++) {
+      const p = randPosAway(START);
       const dx = Math.min(p.x, WORLD_W - p.x);
       const dy = Math.min(p.y, WORLD_H - p.y);
-      const inner = Math.max(beltInnerEdge(p.x, p.y), beltInnerEdge(p.x, p.y)) + 3;
-      if (dx > inner && dy > inner) break;
-      p = randPosAway(START);
+      const inner = beltInnerEdge(p.x, p.y) + 3;
+      if (dx <= inner || dy <= inner) continue;
+      const size = pickAsteroidSize();
+      if (!fits(p.x, p.y, size)) continue;
+      list.push({ x: p.x, y: p.y, size });
+      placed = true;
     }
-    list.push({ x: p.x, y: p.y, size: pickAsteroidSize() });
   }
   // Asteroid belt: dense packing using grid-jitter so the wall is closed.
   const STEP = 1.4; // grid step in cells; smaller => denser
@@ -147,16 +162,23 @@ function makeObstacles(): Obstacle[] {
       const inner = beltInnerEdge(x, y);
       // belt occupies band from edge (0) up to `inner`
       if (dx > inner && dy > inner) continue;
-      // jitter so it doesn't look like a grid
-      const jx = (Math.random() - 0.5) * STEP * 0.9;
-      const jy = (Math.random() - 0.5) * STEP * 0.9;
-      const px = Math.max(0, Math.min(WORLD_W, x + jx));
-      const py = Math.max(0, Math.min(WORLD_H, y + jy));
-      // bigger rocks in deeper belt, smaller near the inner edge
-      const depthFromEdge = Math.min(dx, dy);
-      const t = Math.max(0, Math.min(1, depthFromEdge / Math.max(1, beltInnerEdge(px, py))));
-      const size = (Math.random() < 0.25 ? 5 + Math.random() * 2 : 2.5 + Math.random() * 3) * (1 - t * 0.25);
-      list.push({ x: px, y: py, size });
+      // Try a few jittered positions until one fits without overlap.
+      let placed = false;
+      for (let tries = 0; tries < 6 && !placed; tries++) {
+        const jx = (Math.random() - 0.5) * STEP * 0.9;
+        const jy = (Math.random() - 0.5) * STEP * 0.9;
+        const px = Math.max(0, Math.min(WORLD_W, x + jx));
+        const py = Math.max(0, Math.min(WORLD_H, y + jy));
+        const depthFromEdge = Math.min(dx, dy);
+        const t = Math.max(0, Math.min(1, depthFromEdge / Math.max(1, beltInnerEdge(px, py))));
+        const rawSize = (Math.random() < 0.25 ? 5 + Math.random() * 2 : 2.5 + Math.random() * 3) * (1 - t * 0.25);
+        // Shrink slightly on retries to fit tight spots.
+        const size = rawSize * (1 - tries * 0.08);
+        if (size < 1.6) break;
+        if (!fits(px, py, size)) continue;
+        list.push({ x: px, y: py, size });
+        placed = true;
+      }
     }
   }
   return list;
