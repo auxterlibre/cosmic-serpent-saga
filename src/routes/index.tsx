@@ -540,6 +540,23 @@ function Game() {
     }
   }
 
+  function dropScraps(cx: number, cy: number, count: number) {
+    const s = stateRef.current;
+    const now = performance.now();
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2;
+      const sp = 1.5 + Math.random() * 2.5;
+      s.scraps.push({
+        x: Math.max(0.3, Math.min(WORLD_W - 0.3, cx)),
+        y: Math.max(0.3, Math.min(WORLD_H - 0.3, cy)),
+        vx: Math.cos(a) * sp,
+        vy: Math.sin(a) * sp,
+        value: 1,
+        spawnedAt: now,
+      });
+    }
+  }
+
   function tryBuy(lvlKey: "lvlFireRate" | "lvlDamage" | "lvlRange" | "lvlMultishot" | "lvlSpeed" | "lvlCap", apply: () => void) {
     const s = stateRef.current;
     const kindMap: Record<typeof lvlKey, UpgradeKind> = {
