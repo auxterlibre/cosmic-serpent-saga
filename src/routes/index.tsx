@@ -1717,98 +1717,172 @@ function Game() {
         ctx.translate(hx, hy);
         ctx.rotate(s.headAngle);
 
-        const SR = R * 1.15;
+        const SR = R * 1.25;
         const tNow = performance.now() / 1000;
         const flicker = 0.65 + 0.35 * Math.sin(tNow * 30);
 
-        // Engine thrust plume (behind)
-        ctx.fillStyle = `rgba(255, 170, 60, ${0.55 * flicker})`;
-        ctx.beginPath();
-        ctx.moveTo(-SR * 0.6, -SR * 0.35);
-        ctx.lineTo(-SR * (1.4 + 0.4 * flicker), 0);
-        ctx.lineTo(-SR * 0.6, SR * 0.35);
-        ctx.closePath();
-        ctx.fill();
-        ctx.fillStyle = `rgba(255, 240, 200, ${0.9 * flicker})`;
-        ctx.beginPath();
-        ctx.moveTo(-SR * 0.6, -SR * 0.18);
-        ctx.lineTo(-SR * (1.0 + 0.25 * flicker), 0);
-        ctx.lineTo(-SR * 0.6, SR * 0.18);
-        ctx.closePath();
-        ctx.fill();
+        // palette — industrial orange + gunmetal
+        const ORANGE = "#d96b2a";
+        const ORANGE_DK = "#8a3f15";
+        const GREY = "#5a606a";
+        const GREY_LT = "#8a8f98";
+        const GREY_DK = "#2e3238";
+        const OUTLINE = "#15171c";
 
-        // Swept wings
-        ctx.fillStyle = "#0b1a2a";
-        ctx.strokeStyle = "#7df9ff";
-        ctx.lineWidth = 1.2;
+        // ---- engine pods (rear, one per side) ----
+        const podW = SR * 0.55;
+        const podL = SR * 0.95;
+        const podY = SR * 0.7;
+        for (const sy of [-1, 1]) {
+          // pod body
+          ctx.fillStyle = GREY;
+          ctx.strokeStyle = OUTLINE;
+          ctx.lineWidth = 1.4;
+          const py = sy * podY;
+          ctx.beginPath();
+          ctx.moveTo(-podL * 0.9, py - podW * 0.45);
+          ctx.lineTo(podL * 0.55, py - podW * 0.5);
+          ctx.lineTo(podL * 0.6, py + podW * 0.5);
+          ctx.lineTo(-podL * 0.9, py + podW * 0.45);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          // orange accent stripe along pod
+          ctx.fillStyle = ORANGE;
+          ctx.fillRect(-podL * 0.7, py - podW * 0.12, podL * 1.15, podW * 0.24);
+          // panel line
+          ctx.strokeStyle = GREY_DK;
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(podL * 0.1, py - podW * 0.45);
+          ctx.lineTo(podL * 0.1, py + podW * 0.45);
+          ctx.stroke();
+          // engine nozzle (rear)
+          ctx.fillStyle = GREY_DK;
+          ctx.strokeStyle = OUTLINE;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.arc(-podL * 0.9, py, podW * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          // inner glow
+          const glow = ctx.createRadialGradient(-podL * 0.95, py, 0, -podL * 0.95, py, podW * 0.42);
+          glow.addColorStop(0, `rgba(255,210,140,${0.95 * flicker})`);
+          glow.addColorStop(0.6, `rgba(255,120,40,${0.7 * flicker})`);
+          glow.addColorStop(1, "rgba(40,15,5,0)");
+          ctx.fillStyle = glow;
+          ctx.beginPath();
+          ctx.arc(-podL * 0.95, py, podW * 0.4, 0, Math.PI * 2);
+          ctx.fill();
+          // thrust plume
+          ctx.fillStyle = `rgba(255,170,60,${0.55 * flicker})`;
+          ctx.beginPath();
+          ctx.moveTo(-podL * 0.9, py - podW * 0.25);
+          ctx.lineTo(-podL * (1.5 + 0.4 * flicker), py);
+          ctx.lineTo(-podL * 0.9, py + podW * 0.25);
+          ctx.closePath();
+          ctx.fill();
+          ctx.fillStyle = `rgba(255,240,200,${0.9 * flicker})`;
+          ctx.beginPath();
+          ctx.moveTo(-podL * 0.9, py - podW * 0.13);
+          ctx.lineTo(-podL * (1.2 + 0.25 * flicker), py);
+          ctx.lineTo(-podL * 0.9, py + podW * 0.13);
+          ctx.closePath();
+          ctx.fill();
+        }
+
+        // ---- main hull (chunky orange slab) ----
+        ctx.fillStyle = ORANGE;
+        ctx.strokeStyle = OUTLINE;
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
-        ctx.moveTo(-SR * 0.1, -SR * 0.35);
-        ctx.lineTo(-SR * 0.85, -SR * 1.05);
-        ctx.lineTo(-SR * 0.95, -SR * 0.95);
-        ctx.lineTo(-SR * 0.55, -SR * 0.2);
+        ctx.moveTo(SR * 1.15, 0);
+        ctx.lineTo(SR * 0.9, -SR * 0.55);
+        ctx.lineTo(-SR * 0.85, -SR * 0.7);
+        ctx.lineTo(-SR * 1.0, -SR * 0.35);
+        ctx.lineTo(-SR * 1.0, SR * 0.35);
+        ctx.lineTo(-SR * 0.85, SR * 0.7);
+        ctx.lineTo(SR * 0.9, SR * 0.55);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(-SR * 0.1, SR * 0.35);
-        ctx.lineTo(-SR * 0.85, SR * 1.05);
-        ctx.lineTo(-SR * 0.95, SR * 0.95);
-        ctx.lineTo(-SR * 0.55, SR * 0.2);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
 
-        // Wing-tip cannons
-        ctx.fillStyle = "#1a2a3a";
-        ctx.strokeStyle = "#e0ffff";
+        // inner grey cockpit deck inset
+        ctx.fillStyle = GREY;
+        ctx.strokeStyle = GREY_DK;
         ctx.lineWidth = 1;
-        ctx.fillRect(-SR * 1.0, -SR * 1.05, SR * 0.55, 2);
-        ctx.strokeRect(-SR * 1.0, -SR * 1.05, SR * 0.55, 2);
-        ctx.fillRect(-SR * 1.0, SR * 1.05 - 2, SR * 0.55, 2);
-        ctx.strokeRect(-SR * 1.0, SR * 1.05 - 2, SR * 0.55, 2);
-
-        // Hull (arrowhead)
-        ctx.fillStyle = "#cfefff";
-        ctx.strokeStyle = "#e0ffff";
-        ctx.lineWidth = 1.4;
         ctx.beginPath();
-        ctx.moveTo(SR * 1.25, 0);
-        ctx.lineTo(SR * 0.2, -SR * 0.7);
-        ctx.lineTo(-SR * 0.75, -SR * 0.45);
-        ctx.lineTo(-SR * 0.6, 0);
-        ctx.lineTo(-SR * 0.75, SR * 0.45);
-        ctx.lineTo(SR * 0.2, SR * 0.7);
+        ctx.moveTo(SR * 0.95, 0);
+        ctx.lineTo(SR * 0.7, -SR * 0.4);
+        ctx.lineTo(-SR * 0.55, -SR * 0.5);
+        ctx.lineTo(-SR * 0.7, 0);
+        ctx.lineTo(-SR * 0.55, SR * 0.5);
+        ctx.lineTo(SR * 0.7, SR * 0.4);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Paneling lines
-        ctx.strokeStyle = "rgba(15, 30, 50, 0.55)";
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(SR * 1.25, 0);
-        ctx.lineTo(-SR * 0.6, 0);
-        ctx.moveTo(SR * 0.3, -SR * 0.55);
-        ctx.lineTo(SR * 0.3, SR * 0.55);
-        ctx.stroke();
+        // hazard stripes along rear deck
+        ctx.fillStyle = "rgba(20,20,25,0.7)";
+        for (let i = 0; i < 3; i++) {
+          ctx.fillRect(-SR * 0.65 + i * SR * 0.18, -SR * 0.42, SR * 0.08, SR * 0.84);
+        }
 
-        // Cockpit canopy
-        ctx.fillStyle = "#0f172a";
-        ctx.strokeStyle = "#7df9ff";
-        ctx.lineWidth = 1.2;
+        // ---- cockpit canopy (two round viewports like the ref) ----
+        for (const vy of [-SR * 0.22, SR * 0.22]) {
+          ctx.fillStyle = OUTLINE;
+          ctx.beginPath();
+          ctx.arc(SR * 0.55, vy, SR * 0.16, 0, Math.PI * 2);
+          ctx.fill();
+          // glass
+          const cg = ctx.createRadialGradient(SR * 0.58, vy - SR * 0.04, 0, SR * 0.55, vy, SR * 0.14);
+          cg.addColorStop(0, "rgba(180,220,255,0.95)");
+          cg.addColorStop(0.6, "rgba(70,130,180,0.85)");
+          cg.addColorStop(1, "rgba(15,30,55,0.9)");
+          ctx.fillStyle = cg;
+          ctx.beginPath();
+          ctx.arc(SR * 0.55, vy, SR * 0.13, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // nose plate
+        ctx.fillStyle = GREY_LT;
+        ctx.strokeStyle = OUTLINE;
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.ellipse(SR * 0.35, 0, SR * 0.5, SR * 0.3, 0, 0, Math.PI * 2);
+        ctx.moveTo(SR * 1.15, 0);
+        ctx.lineTo(SR * 0.95, -SR * 0.18);
+        ctx.lineTo(SR * 0.95, SR * 0.18);
+        ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        ctx.fillStyle = "rgba(125, 249, 255, 0.55)";
-        ctx.beginPath();
-        ctx.ellipse(SR * 0.5, -SR * 0.12, SR * 0.18, SR * 0.08, 0, 0, Math.PI * 2);
-        ctx.fill();
 
-        // Nose tip light
+        // rivets along hull edges
+        ctx.fillStyle = GREY_DK;
+        const rivets: [number, number][] = [
+          [SR * 0.85, -SR * 0.5], [SR * 0.3, -SR * 0.62], [-SR * 0.3, -SR * 0.66], [-SR * 0.8, -SR * 0.55],
+          [SR * 0.85, SR * 0.5], [SR * 0.3, SR * 0.62], [-SR * 0.3, SR * 0.66], [-SR * 0.8, SR * 0.55],
+        ];
+        for (const [rx, ry] of rivets) ctx.fillRect(rx - 0.7, ry - 0.7, 1.4, 1.4);
+
+        // antennas on top side
+        ctx.strokeStyle = GREY_LT;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(SR * 0.1, -SR * 0.68);
+        ctx.lineTo(SR * 0.1, -SR * 0.95);
+        ctx.moveTo(-SR * 0.2, -SR * 0.66);
+        ctx.lineTo(-SR * 0.2, -SR * 0.88);
+        ctx.stroke();
         ctx.fillStyle = "#fde047";
         ctx.beginPath();
-        ctx.arc(SR * 1.25, 0, 1.4, 0, Math.PI * 2);
+        ctx.arc(SR * 0.1, -SR * 0.95, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // nose tip light
+        ctx.fillStyle = "#fde047";
+        ctx.beginPath();
+        ctx.arc(SR * 1.15, 0, 1.4, 0, Math.PI * 2);
         ctx.fill();
 
         ctx.restore();
