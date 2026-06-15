@@ -141,4 +141,13 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
   }
+
+  /* Prevent accidental text/element selection while playing on touch devices. */
+  .no-select,
+  .no-select * {
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
 }
