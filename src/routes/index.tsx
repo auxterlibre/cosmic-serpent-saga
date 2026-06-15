@@ -2612,6 +2612,10 @@ function Game() {
               );
             })}
           </div>
+          <div className="mt-1 flex items-center gap-1 border-t border-cyan-500/20 pt-1 text-amber-200">
+            <span className="opacity-80">SCRAP</span>
+            <span className="ml-auto tabular-nums font-semibold">{hud.scrap}</span>
+          </div>
         </div>
       )}
 
