@@ -1049,22 +1049,33 @@ function Game() {
             while (diff < -Math.PI) diff += Math.PI * 2;
             h.angle += diff * Math.min(1, dtSec * 8);
 
-            // Offset trail behind the hunter so there's a visible gap before the first stolen segment.
+            // Stolen segments follow the hunter in a chain, mirroring the player's body movement.
             const HUNTER_TRAIL_GAP = 1.4;
-            const trailX = h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP;
-            const trailY = h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP;
-            const last0 = h.trail[0];
-            if (!last0 || Math.hypot(trailX - last0.x, trailY - last0.y) >= 1) {
-              const cIdx = h.trail.length;
-              const st = h.stolen[cIdx];
-              h.trail.unshift({ x: trailX, y: trailY, color: st?.color ?? SEG_COLOR_DEFAULT, rarity: st?.rarity ?? "common" });
+            // Sync trail length with stolen count; spawn new tail segments at the current tail's position.
+            while (h.trail.length < h.stolen.length) {
+              const tail = h.trail[h.trail.length - 1] ?? { x: h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP, y: h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP };
+              h.trail.push({ x: tail.x, y: tail.y, color: SEG_COLOR_DEFAULT, rarity: "common" });
             }
-            const maxTrail = Math.max(0, h.stolen.length);
-            if (h.trail.length > maxTrail) h.trail.length = maxTrail;
+            if (h.trail.length > h.stolen.length) h.trail.length = h.stolen.length;
             for (let ti = 0; ti < h.trail.length; ti++) {
               const st = h.stolen[ti];
               h.trail[ti].color = st?.color ?? SEG_COLOR_DEFAULT;
               h.trail[ti].rarity = st?.rarity ?? "common";
+            }
+            // Chain-follow: each segment is pulled toward the one in front of it.
+            const anchorX = h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP;
+            const anchorY = h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP;
+            for (let ti = 0; ti < h.trail.length; ti++) {
+              const prev = ti === 0 ? { x: anchorX, y: anchorY } : h.trail[ti - 1];
+              const cur = h.trail[ti];
+              const ddx = prev.x - cur.x;
+              const ddy = prev.y - cur.y;
+              const dd = Math.hypot(ddx, ddy);
+              if (dd > SEG_SPACING && dd > 0) {
+                const k = (dd - SEG_SPACING) / dd;
+                cur.x += ddx * k;
+                cur.y += ddy * k;
+              }
             }
           }
 
