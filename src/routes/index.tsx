@@ -1824,6 +1824,89 @@ function Game() {
         }
       }
 
+      // Shared cargo-segment renderer (used by player body AND hunter stolen trail)
+      const _blinkOnSeg = Math.floor(performance.now() / 180) % 2 === 0;
+      const drawCargoSegment = (px: number, py: number, ang: number, color: string, overCap: boolean) => {
+        const R = CELL * 0.45;
+        const tint = overCap && _blinkOnSeg ? "#ef4444" : color;
+        const outline = overCap ? "#ef4444" : "#e0ffff";
+        const lw = overCap ? 1.8 : 1.2;
+        const shade = (hex: string, amt: number) => {
+          const h = hex.replace("#", "");
+          const r = parseInt(h.slice(0, 2), 16);
+          const g = parseInt(h.slice(2, 4), 16);
+          const b = parseInt(h.slice(4, 6), 16);
+          const m = (v: number) => Math.max(0, Math.min(255, Math.round(v + amt)));
+          return `rgb(${m(r)},${m(g)},${m(b)})`;
+        };
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(ang);
+        ctx.fillStyle = shade(tint, -55);
+        ctx.fillRect(-R, -R, R * 2, R * 2);
+        const grad = ctx.createLinearGradient(0, -R, 0, R);
+        grad.addColorStop(0, "rgba(255,255,255,0.28)");
+        grad.addColorStop(0.5, "rgba(255,255,255,0.05)");
+        grad.addColorStop(1, "rgba(0,0,0,0.35)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(-R, -R, R * 2, R * 2);
+        ctx.strokeStyle = outline;
+        ctx.lineWidth = lw;
+        ctx.strokeRect(-R, -R, R * 2, R * 2);
+        ctx.strokeStyle = shade(tint, -90);
+        ctx.lineWidth = 0.8;
+        ctx.strokeRect(-R * 0.78, -R * 0.78, R * 1.56, R * 1.56);
+        ctx.fillStyle = shade(tint, -30);
+        ctx.fillRect(-R * 0.62, -R * 0.32, R * 1.24, R * 0.64);
+        ctx.strokeStyle = "rgba(0,0,0,0.55)";
+        ctx.lineWidth = 0.9;
+        ctx.strokeRect(-R * 0.62, -R * 0.32, R * 1.24, R * 0.64);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(-R * 0.62, -R * 0.32, R * 1.24, R * 0.64);
+        ctx.clip();
+        ctx.strokeStyle = "rgba(0,0,0,0.35)";
+        ctx.lineWidth = 0.7;
+        for (let x = -R * 1.2; x <= R * 1.2; x += R * 0.22) {
+          ctx.beginPath();
+          ctx.moveTo(x, -R);
+          ctx.lineTo(x + R, R);
+          ctx.stroke();
+        }
+        ctx.restore();
+        ctx.strokeStyle = "rgba(0,0,0,0.45)";
+        ctx.lineWidth = 0.7;
+        for (const yy of [-R * 0.6, -R * 0.45, R * 0.45, R * 0.6]) {
+          ctx.beginPath();
+          ctx.moveTo(-R * 0.85, yy);
+          ctx.lineTo(R * 0.85, yy);
+          ctx.stroke();
+        }
+        ctx.strokeStyle = "rgba(255,255,255,0.22)";
+        ctx.lineWidth = 0.5;
+        for (const yy of [-R * 0.58, -R * 0.43]) {
+          ctx.beginPath();
+          ctx.moveTo(-R * 0.85, yy);
+          ctx.lineTo(R * 0.85, yy);
+          ctx.stroke();
+        }
+        const rv = R * 0.16;
+        for (const [sx, sy] of [[-1,-1],[1,-1],[-1,1],[1,1]] as const) {
+          const bx = sx * (R - rv * 1.1);
+          const by = sy * (R - rv * 1.1);
+          ctx.fillStyle = shade(tint, -70);
+          ctx.beginPath();
+          ctx.arc(bx, by, rv * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = outline;
+          ctx.beginPath();
+          ctx.arc(bx - rv * 0.18, by - rv * 0.18, rv * 0.32, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      };
+
+
       // ---- Hunters: alien fighters ----
       for (const h of s.hunters) {
         const cx = h.x * CELL + CELL / 2 - camX;
