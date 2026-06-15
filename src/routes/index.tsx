@@ -1913,18 +1913,16 @@ function Game() {
         const cy = h.y * CELL + CELL / 2 - camY;
         if (cx < -CELL * 4 || cy < -CELL * 4 || cx > wViewW + CELL * 4 || cy > wViewH + CELL * 4) continue;
 
-        // stolen segment trail
-        for (const t of h.trail) {
+        // stolen segment trail — render as identical cargo crates
+        for (let ti = 0; ti < h.trail.length; ti++) {
+          const t = h.trail[ti];
+          const ahead = ti === 0 ? { x: h.x, y: h.y } : h.trail[ti - 1];
+          const ang = Math.atan2(ahead.y - t.y, ahead.x - t.x);
           const tx = t.x * CELL + CELL / 2 - camX;
           const ty = t.y * CELL + CELL / 2 - camY;
-          ctx.fillStyle = t.color;
-          ctx.beginPath();
-          ctx.arc(tx, ty, CELL * 0.42, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = "rgba(255,255,255,0.45)";
-          ctx.lineWidth = 1;
-          ctx.stroke();
+          drawCargoSegment(tx, ty, ang, t.color, false);
         }
+
 
         ctx.save();
         ctx.translate(cx, cy);
