@@ -895,8 +895,9 @@ function Game() {
         }
       }
 
-      const CP_TRIGGER = PICK + 2.7;
+      const CP_TRIGGER = (PICK + 2.7) * 0.8;
       const CP_RELEASE = CP_TRIGGER + 1.2;
+
       for (let i = 0; i < s.checkpoints.length; i++) {
         const cp = s.checkpoints[i];
         const dx = (cp.x + 0.5) - hx;
