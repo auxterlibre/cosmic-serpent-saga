@@ -2575,7 +2575,7 @@ function Game() {
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#0a0a18]" style={{ overscrollBehavior: "none", touchAction: "none" }}>
+    <div className="no-select relative h-screen w-screen overflow-hidden bg-[#0a0a18]" style={{ overscrollBehavior: "none", touchAction: "none" }}>
       <style>{`
         @keyframes res-blink {
           0%, 100% { transform: scale(1); filter: brightness(1); text-shadow: none; }
