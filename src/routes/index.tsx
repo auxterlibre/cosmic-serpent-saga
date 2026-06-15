@@ -38,7 +38,7 @@ type Vec = { x: number; y: number };
 type Colored = { x: number; y: number; color: string; rarity: Rarity };
 
 type Obstacle = { x: number; y: number; size: number };
-type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null; wanderTarget: Vec | null };
+type Hunter = { x: number; y: number; angle: number; cooldown: number; hp: number; elite: boolean; trail: { x: number; y: number; color: string; rarity: Rarity }[]; stolen: { color: string; rarity: Rarity }[]; fleeing: boolean; fleeTarget: Vec | null; wanderTarget: Vec | null };
 type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type WardenShot = { x: number; y: number; vx: number; vy: number; life: number };
@@ -935,7 +935,7 @@ function Game() {
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
-            s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+            s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, elite: false, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
           }
         } else if (activeCount > desired) {
           let toRemove = activeCount - desired;
@@ -987,6 +987,8 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
+          if (!h.elite && h.stolen.length >= 5) { h.elite = true; h.hp += 3; }
+
 
           let tx: number, ty: number;
           if (h.fleeing) {
@@ -1943,6 +1945,8 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
+        const eliteScale = h.elite ? 1.35 : 1;
+        if (h.elite) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
         const flareLen = 4 + Math.random() * 4;
@@ -1954,8 +1958,8 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         // hull
-        ctx.fillStyle = h.fleeing ? "#7c2d12" : "#9a3412";
-        ctx.strokeStyle = "#fdba74";
+        ctx.fillStyle = h.fleeing ? "#7c2d12" : (h.elite ? "#b91c1c" : "#9a3412");
+        ctx.strokeStyle = h.elite ? "#fecaca" : "#fdba74";
         ctx.lineWidth = 1.25;
         ctx.beginPath();
         ctx.moveTo(S + 2, 0);
@@ -1968,9 +1972,9 @@ function Game() {
         ctx.fill();
         ctx.stroke();
         // cockpit
-        ctx.fillStyle = "#fde047";
+        ctx.fillStyle = h.elite ? "#fef08a" : "#fde047";
         ctx.beginPath();
-        ctx.arc(1, 0, 1.8, 0, Math.PI * 2);
+        ctx.arc(1, 0, h.elite ? 2.2 : 1.8, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
