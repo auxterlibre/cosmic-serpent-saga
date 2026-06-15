@@ -935,7 +935,7 @@ function Game() {
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
-            s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
+            s.hunters.push({ ...randPlayablePosAway(s.snake[0] ?? START), angle: 0, cooldown: 0, hp: 1, elite: false, trail: [], stolen: [], fleeing: false, fleeTarget: null, wanderTarget: null });
           }
         } else if (activeCount > desired) {
           let toRemove = activeCount - desired;
