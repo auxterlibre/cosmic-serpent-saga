@@ -1284,8 +1284,18 @@ function Game() {
         const loot = Math.max(0, s.snake.length - 1);
         const desired = loot >= 12 ? 7 : loot >= 4 ? 5 : 4;
         if (s.wardens.length < desired) {
+          const CP_MIN = 18; // do not spawn wardens too close to a checkpoint
           for (let i = 0; i < desired - s.wardens.length; i++) {
-            const pos = randPlayablePosAway(s.snake[0] ?? START);
+            let pos = randPlayablePosAway(s.snake[0] ?? START);
+            for (let tries = 0; tries < 30; tries++) {
+              let ok = true;
+              for (const cp of s.checkpoints) {
+                const dx = pos.x - cp.x, dy = pos.y - cp.y;
+                if (dx * dx + dy * dy < CP_MIN * CP_MIN) { ok = false; break; }
+              }
+              if (ok) break;
+              pos = randPlayablePosAway(s.snake[0] ?? START);
+            }
             s.wardens.push({ x: pos.x, y: pos.y, angle: 0, hp: WARDEN_HP, cooldown: 1500 });
           }
         }
@@ -2523,7 +2533,52 @@ function Game() {
         ctx.stroke();
         ctx.setLineDash([]);
       }
+
+      // ---- Off-screen checkpoint indicator arrows (screen-space) ----
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      {
+        const margin = 22;
+        const cxS = viewW / 2;
+        const cyS = viewH / 2;
+        for (const cp of s.checkpoints) {
+          const sx = (cp.x * CELL - camX) * zoom;
+          const sy = (cp.y * CELL - camY) * zoom;
+          const onScreen = sx >= 0 && sy >= 0 && sx <= viewW && sy <= viewH;
+          if (onScreen) continue;
+          // Direction from screen center to checkpoint
+          const dx = sx - cxS;
+          const dy = sy - cyS;
+          const ang = Math.atan2(dy, dx);
+          // Clamp ray to rectangle viewport with margin
+          const halfW = viewW / 2 - margin;
+          const halfH = viewH / 2 - margin;
+          const cos = Math.cos(ang);
+          const sin = Math.sin(ang);
+          const tX = cos !== 0 ? halfW / Math.abs(cos) : Infinity;
+          const tY = sin !== 0 ? halfH / Math.abs(sin) : Infinity;
+          const t = Math.min(tX, tY);
+          const ax = cxS + cos * t;
+          const ay = cyS + sin * t;
+          ctx.save();
+          ctx.translate(ax, ay);
+          ctx.rotate(ang);
+          // Arrow
+          ctx.fillStyle = "#7df9ff";
+          ctx.strokeStyle = "#0b1320";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(14, 0);
+          ctx.lineTo(-8, -9);
+          ctx.lineTo(-3, 0);
+          ctx.lineTo(-8, 9);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
     };
+
 
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
