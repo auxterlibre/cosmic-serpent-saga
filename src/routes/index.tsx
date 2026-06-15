@@ -1284,8 +1284,18 @@ function Game() {
         const loot = Math.max(0, s.snake.length - 1);
         const desired = loot >= 12 ? 7 : loot >= 4 ? 5 : 4;
         if (s.wardens.length < desired) {
+          const CP_MIN = 18; // do not spawn wardens too close to a checkpoint
           for (let i = 0; i < desired - s.wardens.length; i++) {
-            const pos = randPlayablePosAway(s.snake[0] ?? START);
+            let pos = randPlayablePosAway(s.snake[0] ?? START);
+            for (let tries = 0; tries < 30; tries++) {
+              let ok = true;
+              for (const cp of s.checkpoints) {
+                const dx = pos.x - cp.x, dy = pos.y - cp.y;
+                if (dx * dx + dy * dy < CP_MIN * CP_MIN) { ok = false; break; }
+              }
+              if (ok) break;
+              pos = randPlayablePosAway(s.snake[0] ?? START);
+            }
             s.wardens.push({ x: pos.x, y: pos.y, angle: 0, hp: WARDEN_HP, cooldown: 1500 });
           }
         }
