@@ -1049,11 +1049,15 @@ function Game() {
             while (diff < -Math.PI) diff += Math.PI * 2;
             h.angle += diff * Math.min(1, dtSec * 8);
 
+            // Offset trail behind the hunter so there's a visible gap before the first stolen segment.
+            const HUNTER_TRAIL_GAP = 1.4;
+            const trailX = h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP;
+            const trailY = h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP;
             const last0 = h.trail[0];
-            if (!last0 || Math.hypot(h.x - last0.x, h.y - last0.y) >= 1) {
+            if (!last0 || Math.hypot(trailX - last0.x, trailY - last0.y) >= 1) {
               const cIdx = h.trail.length;
               const st = h.stolen[cIdx];
-              h.trail.unshift({ x: h.x, y: h.y, color: st?.color ?? SEG_COLOR_DEFAULT, rarity: st?.rarity ?? "common" });
+              h.trail.unshift({ x: trailX, y: trailY, color: st?.color ?? SEG_COLOR_DEFAULT, rarity: st?.rarity ?? "common" });
             }
             const maxTrail = Math.max(0, h.stolen.length);
             if (h.trail.length > maxTrail) h.trail.length = maxTrail;
@@ -2607,6 +2611,10 @@ function Game() {
                 />
               );
             })}
+          </div>
+          <div className="mt-1 flex items-center gap-1 border-t border-cyan-500/20 pt-1 text-amber-200">
+            <span className="opacity-80">SCRAP</span>
+            <span className="ml-auto tabular-nums font-semibold">{hud.scrap}</span>
           </div>
         </div>
       )}
