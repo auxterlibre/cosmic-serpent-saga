@@ -1945,6 +1945,8 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
+        const eliteScale = h.elite ? 1.35 : 1;
+        if (h.elite) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
         const flareLen = 4 + Math.random() * 4;
@@ -1956,8 +1958,8 @@ function Game() {
         ctx.closePath();
         ctx.fill();
         // hull
-        ctx.fillStyle = h.fleeing ? "#7c2d12" : "#9a3412";
-        ctx.strokeStyle = "#fdba74";
+        ctx.fillStyle = h.fleeing ? "#7c2d12" : (h.elite ? "#b91c1c" : "#9a3412");
+        ctx.strokeStyle = h.elite ? "#fecaca" : "#fdba74";
         ctx.lineWidth = 1.25;
         ctx.beginPath();
         ctx.moveTo(S + 2, 0);
@@ -1970,9 +1972,9 @@ function Game() {
         ctx.fill();
         ctx.stroke();
         // cockpit
-        ctx.fillStyle = "#fde047";
+        ctx.fillStyle = h.elite ? "#fef08a" : "#fde047";
         ctx.beginPath();
-        ctx.arc(1, 0, 1.8, 0, Math.PI * 2);
+        ctx.arc(1, 0, h.elite ? 2.2 : 1.8, 0, Math.PI * 2);
         ctx.fill();
         ctx.restore();
       }
