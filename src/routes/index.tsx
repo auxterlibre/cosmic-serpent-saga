@@ -1050,7 +1050,7 @@ function Game() {
             h.angle += diff * Math.min(1, dtSec * 8);
 
             // Stolen segments follow the hunter in a chain, mirroring the player's body movement.
-            const HUNTER_TRAIL_GAP = 1.4;
+            const HUNTER_TRAIL_GAP = SEG_SPACING;
             // Sync trail length with stolen count; spawn new tail segments at the current tail's position.
             while (h.trail.length < h.stolen.length) {
               const tail = h.trail[h.trail.length - 1] ?? { x: h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP, y: h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP };
