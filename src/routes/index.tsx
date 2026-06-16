@@ -2458,6 +2458,23 @@ function Game() {
         ctx.beginPath();
         ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
         ctx.fill();
+        // hit flash
+        if (w.hitT0) {
+          const age = performance.now() - w.hitT0;
+          if (age < 180) {
+            const a = (1 - age / 180) * 0.85;
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.beginPath();
+            ctx.moveTo(R, 0);
+            ctx.lineTo(R * 0.55, R * 0.85);
+            ctx.lineTo(-R * 0.7, R * 0.95);
+            ctx.lineTo(-R, 0);
+            ctx.lineTo(-R * 0.7, -R * 0.95);
+            ctx.lineTo(R * 0.55, -R * 0.85);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
