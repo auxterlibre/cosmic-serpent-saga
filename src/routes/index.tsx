@@ -1089,8 +1089,13 @@ function Game() {
           const dy = ty - (h.y + 0.5);
           const dist = Math.hypot(dx, dy);
           if (dist > 0.01) {
-            const nx = dx / dist;
-            const ny = dy / dist;
+            let nx = dx / dist;
+            let ny = dy / dist;
+            const av = obstacleAvoidance(h.x + 0.5, h.y + 0.5, 1.6);
+            nx += av.ax * 3;
+            ny += av.ay * 3;
+            const nlen = Math.hypot(nx, ny) || 1;
+            nx /= nlen; ny /= nlen;
             const fleeSpeedMul = h.fleeing ? 1.15 : 1;
             const move = Math.min(step * fleeSpeedMul, dist);
             h.x += nx * move;
