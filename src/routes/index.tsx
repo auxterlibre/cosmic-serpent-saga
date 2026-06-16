@@ -1706,11 +1706,13 @@ function Game() {
                   s.explosions.push({ x: seg.x, y: seg.y, t0: now });
                   for (let k = 1; k < s.snake.length; k++) {
                     const sg = s.snake[k];
+                    const segT = now + 60 + k * 80;
                     s.explosions.push({
                       x: sg.x + (Math.random() - 0.5) * 0.4,
                       y: sg.y + (Math.random() - 0.5) * 0.4,
-                      t0: now + 60 + k * 80,
+                      t0: segT,
                     });
+                    shatterSegment(s.debris, sg.x, sg.y, sg.color, segT);
                   }
                   s.snake = [];
                   s.alive = false;
@@ -1720,6 +1722,8 @@ function Game() {
                   // is released back into space as collectible loot.
                   const removed = s.snake.splice(i);
                   s.explosions.push({ x: removed[0].x, y: removed[0].y, t0: now });
+                  shatterSegment(s.debris, removed[0].x, removed[0].y, removed[0].color, now);
+
                   for (let k = 1; k < removed.length; k++) {
                     const sg = removed[k];
                     let rar: Rarity = "common";
