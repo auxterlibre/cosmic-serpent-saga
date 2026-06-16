@@ -40,7 +40,6 @@ const ELITE_RENDER_SCALE = 1.8;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 5;
-const HIT_FLASH_MS = 150;
 const WARDEN_FIRE_INTERVAL = 2200;
 const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
 const WARDEN_PREFERRED_DIST = 12;
@@ -63,10 +62,8 @@ type Hunter = {
   fleeing: boolean;
   fleeTarget: Vec | null;
   wanderTarget: Vec | null;
-  morphT0?: number;
-  hitT0?: number;
 };
-type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number; hitT0?: number };
+type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type WardenShot = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
@@ -213,38 +210,6 @@ function pointInObstacle(x: number, y: number, pad = 0): boolean {
   }
   return false;
 }
-
-// Shatter a destroyed cargo segment into colored debris chunks — same system
-// as asteroids, just sized for the segment and tinted to its rarity color.
-function shatterSegment(debris: Debris[], x: number, y: number, color: string, t0: number) {
-  const hex = color.replace("#", "");
-  const r = parseInt(hex.slice(0, 2), 16) || 180;
-  const g = parseInt(hex.slice(2, 4), 16) || 180;
-  const b = parseInt(hex.slice(4, 6), 16) || 180;
-  const baseFill = `rgb(${r},${g},${b})`;
-  const craterC = `rgb(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)})`;
-  const seedBase = ((Math.floor(x * 100) * 73856093) ^ (Math.floor(y * 100) * 19349663)) >>> 0;
-  const pieces = 5;
-  for (let k = 0; k < pieces; k++) {
-    const a = (k / pieces) * Math.PI * 2 + Math.random() * 0.8;
-    const sp = 1.6 + Math.random() * 2.4;
-    debris.push({
-      x: x + Math.cos(a) * 0.1,
-      y: y + Math.sin(a) * 0.1,
-      vx: Math.cos(a) * sp,
-      vy: Math.sin(a) * sp,
-      rot: Math.random() * Math.PI * 2,
-      vr: (Math.random() - 0.5) * 7,
-      size: 0.22 + Math.random() * 0.2,
-      t0,
-      seed: (seedBase + k * 2654435761) >>> 0,
-      baseFill,
-      craterC,
-    });
-  }
-}
-
-
 
 const LOOT_MIN_SPACING = 4;
 function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
@@ -563,10 +528,8 @@ function Game() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "r" || e.key === "R") && (e.shiftKey || e.ctrlKey || e.metaKey)) {
-        // Prevent macOS Cmd+R / Ctrl+R from reloading the page mid-game
-        e.preventDefault();
-        if (!stateRef.current.alive) reset();
+      if ((e.key === "r" || e.key === "R") && (e.shiftKey || e.ctrlKey || e.metaKey) && !stateRef.current.alive) {
+        reset();
         return;
       }
       if (e.key === "Escape") {
@@ -1074,16 +1037,13 @@ function Game() {
           // Blow up every cargo segment in sequence from head to tail, then clear the train.
           for (let k = 1; k < s.snake.length; k++) {
             const seg = s.snake[k];
-            const segT = now + 40 + k * 90;
             s.explosions.push({
               x: seg.x + (Math.random() - 0.5) * 0.4,
               y: seg.y + (Math.random() - 0.5) * 0.4,
-              t0: segT,
+              t0: now + 40 + k * 90,
             });
-            shatterSegment(s.debris, seg.x, seg.y, seg.color, segT);
           }
           s.snake = [];
-
           // Shatter the asteroid into debris chunks.
           const seed = ((Math.floor(o.x * 100) * 73856093) ^ (Math.floor(o.y * 100) * 19349663)) >>> 0;
           const tintRoll = (seed % 1000) / 1000;
@@ -1231,7 +1191,6 @@ function Game() {
             h.fleeTarget = null;
             h.wanderTarget = null;
             h.cooldown = ELITE_UPGRADE_COOLDOWN;
-            h.morphT0 = performance.now();
           }
 
           let tx: number, ty: number;
@@ -1432,15 +1391,12 @@ function Game() {
               // Chain-detonate the cargo train from head to tail.
               for (let k = 1; k < s.snake.length; k++) {
                 const seg = s.snake[k];
-                const segT = now + 80 + k * 90;
                 s.explosions.push({
                   x: seg.x + (Math.random() - 0.5) * 0.4,
                   y: seg.y + (Math.random() - 0.5) * 0.4,
-                  t0: segT,
+                  t0: now + 80 + k * 90,
                 });
-                shatterSegment(s.debris, seg.x, seg.y, seg.color, segT);
               }
-
               s.snake = [];
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
@@ -1545,7 +1501,6 @@ function Game() {
             const dy = p.y - (h.y + 0.5);
             if (dx * dx + dy * dy <= hr * hr) {
               h.hp -= s.damage;
-              h.hitT0 = performance.now();
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
@@ -1568,7 +1523,7 @@ function Game() {
               return false;
             }
           }
-          // Player projectiles damage wardens.
+          // Player projectiles also damage wardens.
           for (let i = 0; i < s.wardens.length; i++) {
             const w = s.wardens[i];
             const wr = 1.0;
@@ -1576,7 +1531,6 @@ function Game() {
             const dy = p.y - (w.y + 0.5);
             if (dx * dx + dy * dy <= wr * wr) {
               w.hp -= s.damage;
-              w.hitT0 = performance.now();
               if (w.hp <= 0) {
                 s.score += 60;
                 const nowK = performance.now();
@@ -1714,13 +1668,11 @@ function Game() {
                   s.explosions.push({ x: seg.x, y: seg.y, t0: now });
                   for (let k = 1; k < s.snake.length; k++) {
                     const sg = s.snake[k];
-                    const segT = now + 60 + k * 80;
                     s.explosions.push({
                       x: sg.x + (Math.random() - 0.5) * 0.4,
                       y: sg.y + (Math.random() - 0.5) * 0.4,
-                      t0: segT,
+                      t0: now + 60 + k * 80,
                     });
-                    shatterSegment(s.debris, sg.x, sg.y, sg.color, segT);
                   }
                   s.snake = [];
                   s.alive = false;
@@ -1730,8 +1682,6 @@ function Game() {
                   // is released back into space as collectible loot.
                   const removed = s.snake.splice(i);
                   s.explosions.push({ x: removed[0].x, y: removed[0].y, t0: now });
-                  shatterSegment(s.debris, removed[0].x, removed[0].y, removed[0].color, now);
-
                   for (let k = 1; k < removed.length; k++) {
                     const sg = removed[k];
                     let rar: Rarity = "common";
@@ -2315,54 +2265,11 @@ function Game() {
           drawCargoSegment(tx, ty, ang, t.color, false);
         }
 
-        // Elite transformation effect (rings + flash) rendered behind the ship
-        const MORPH_DUR = 700;
-        const morphE = h.morphT0 ? (performance.now() - h.morphT0) / MORPH_DUR : 1;
-        if (morphE < 1) {
-          ctx.save();
-          ctx.translate(cx, cy);
-          // expanding shockwave rings
-          for (let r = 0; r < 2; r++) {
-            const rE = Math.min(1, morphE + r * 0.18);
-            if (rE <= 0 || rE >= 1) continue;
-            const rad = 4 + rE * (CELL * 2.4);
-            ctx.strokeStyle = `rgba(254, 240, 138, ${(1 - rE) * 0.9})`;
-            ctx.lineWidth = 2.5 * (1 - rE) + 0.5;
-            ctx.beginPath();
-            ctx.arc(0, 0, rad, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-          // radial sparks
-          const sparkN = 8;
-          for (let i = 0; i < sparkN; i++) {
-            const a = (i / sparkN) * Math.PI * 2;
-            const len = CELL * 0.6 + morphE * CELL * 1.6;
-            const x0 = Math.cos(a) * (CELL * 0.4);
-            const y0 = Math.sin(a) * (CELL * 0.4);
-            const x1 = Math.cos(a) * len;
-            const y1 = Math.sin(a) * len;
-            ctx.strokeStyle = `rgba(252, 165, 165, ${(1 - morphE) * 0.85})`;
-            ctx.lineWidth = 1.2;
-            ctx.beginPath();
-            ctx.moveTo(x0, y0);
-            ctx.lineTo(x1, y1);
-            ctx.stroke();
-          }
-          ctx.restore();
-        }
-
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        // scale punch on morph: overshoots past elite scale, then settles
-        let eliteScale = h.elite ? ELITE_RENDER_SCALE : 1;
-        if (h.elite && morphE < 1) {
-          // 0..1 punch curve: starts at 1, overshoots to 1.45x ELITE, settles to 1
-          const p = morphE;
-          const punch = 1 + Math.sin(p * Math.PI) * 0.45 * (1 - p * 0.4);
-          eliteScale *= punch;
-        }
-        if (eliteScale !== 1) ctx.scale(eliteScale, eliteScale);
+        const eliteScale = h.elite ? ELITE_RENDER_SCALE : 1;
+        if (h.elite) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
         const flareLen = 4 + Math.random() * 4;
@@ -2392,23 +2299,6 @@ function Game() {
         ctx.beginPath();
         ctx.arc(1, 0, h.elite ? 2.2 : 1.8, 0, Math.PI * 2);
         ctx.fill();
-        // white flash overlay during morph
-        if (h.elite && morphE < 1) {
-          ctx.fillStyle = `rgba(255, 255, 255, ${(1 - morphE) * 0.55})`;
-          ctx.beginPath();
-          ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        // white flash overlay when hit
-        if (h.hitT0) {
-          const fE = (performance.now() - h.hitT0) / HIT_FLASH_MS;
-          if (fE < 1) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - fE) * 0.85})`;
-            ctx.beginPath();
-            ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
         ctx.restore();
       }
 
@@ -2467,17 +2357,19 @@ function Game() {
         ctx.beginPath();
         ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
         ctx.fill();
-        // hit flash overlay
-        if (w.hitT0) {
-          const fE = (performance.now() - w.hitT0) / HIT_FLASH_MS;
-          if (fE < 1) {
-            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - fE) * 0.7})`;
-            ctx.beginPath();
-            ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        }
+        // HP pip ring
         ctx.restore();
+        const hpFrac = Math.max(0, w.hp / WARDEN_HP);
+        ctx.strokeStyle = "rgba(20,20,30,0.7)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.25, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(cx, cy, R * 1.25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpFrac);
+        ctx.stroke();
       }
 
       // ---- Warden shots: chunky orange plasma ----
@@ -3160,10 +3052,7 @@ function Game() {
               <li>
                 ⌨️ <span className="opacity-80">Arrows or WASD</span> on keyboard
               </li>
-              <li>💎 Collect loot — common, uncommon, rare, epic — to grow and spend at checkpoints</li>
-              <li>🟧 Hunters chase you — you auto-fire at the nearest ones</li>
-              <li>🎯 Multi-shot upgrades let you fire at multiple enemies at once</li>
-              <li>🟪 Checkpoints open the upgrade shop</li>
+              <li>💎 Collect loot upgrade at the checkpoint</li>
             </ul>
 
             <button
