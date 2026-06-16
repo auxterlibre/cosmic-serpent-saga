@@ -2394,6 +2394,16 @@ function Game() {
           ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
           ctx.fill();
         }
+        // white flash overlay when hit
+        if (h.hitT0) {
+          const fE = (performance.now() - h.hitT0) / HIT_FLASH_MS;
+          if (fE < 1) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - fE) * 0.85})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
