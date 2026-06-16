@@ -1611,7 +1611,7 @@ function Game() {
               if (ok) break;
               pos = randPlayablePosAway(s.snake[0] ?? START);
             }
-            s.wardens.push({ x: pos.x, y: pos.y, angle: 0, hp: WARDEN_HP, cooldown: 1500 });
+            s.wardens.push({ x: pos.x, y: pos.y, angle: 0, cooldown: 1500 });
           }
         }
         const head = s.snake[0];
