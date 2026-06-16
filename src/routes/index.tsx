@@ -987,7 +987,7 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
-          if (!h.elite && h.stolen.length >= 5) { h.elite = true; h.hp += 3; }
+          if (!h.elite && h.stolen.length >= 5) { h.elite = true; h.hp += 3; h.stolen.length = 0; h.trail.length = 0; }
 
 
           let tx: number, ty: number;
@@ -1955,7 +1955,7 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        const eliteScale = h.elite ? 1.35 : 1;
+        const eliteScale = h.elite ? 1.8 : 1;
         if (h.elite) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
