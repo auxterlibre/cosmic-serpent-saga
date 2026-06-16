@@ -1578,6 +1578,7 @@ function Game() {
             const dy = p.y - (w.y + 0.5);
             if (dx * dx + dy * dy <= wr * wr) {
               w.hp -= s.damage;
+              w.hitT0 = performance.now();
               if (w.hp <= 0) {
                 s.score += 60;
                 const nowK = performance.now();
