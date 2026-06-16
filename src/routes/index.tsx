@@ -1466,6 +1466,10 @@ function Game() {
             p.x += p.vx * stepDt;
             p.y += p.vy * stepDt;
             if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
+            if (pointInObstacle(p.x, p.y, 0)) {
+              s.explosions.push({ x: p.x, y: p.y, t0: performance.now() });
+              return false;
+            }
             for (let i = 0; i < s.snake.length; i++) {
               const seg = s.snake[i];
               const dx = p.x - seg.x;
