@@ -204,7 +204,7 @@ function pointInObstacle(x: number, y: number, pad = 0): boolean {
   for (const o of CURRENT_OBSTACLES) {
     const cx = o.x + o.size / 2;
     const cy = o.y + o.size / 2;
-    const r = (o.size / 2) * 0.72 + pad;
+    const r = (o.size / 2) * 0.88 + pad;
     const dx = x - cx,
       dy = y - cy;
     if (dx * dx + dy * dy <= r * r) return true;
