@@ -1416,11 +1416,10 @@ function Game() {
                 // Push in body order so closest-to-head ends up first in stolen (head of hunter's tail).
                 h.stolen.push({ color: seg.color, rarity: rar });
               }
-              h.cooldown = 400;
-              h.fleeing = true;
-              const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
-              const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
-              h.fleeTarget = { x: ex, y: ey };
+              // Brief cooldown after biting, then circle back and keep chasing — no flee.
+              h.cooldown = 800;
+              h.fleeing = false;
+              h.fleeTarget = null;
               syncHud();
             }
           }
