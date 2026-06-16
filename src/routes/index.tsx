@@ -1544,6 +1544,7 @@ function Game() {
             const dy = p.y - (h.y + 0.5);
             if (dx * dx + dy * dy <= hr * hr) {
               h.hp -= s.damage;
+              h.hitT0 = performance.now();
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
@@ -1566,24 +1567,21 @@ function Game() {
               return false;
             }
           }
-          // Player projectiles also damage wardens.
+          // Player projectiles destroy wardens in a single hit.
           for (let i = 0; i < s.wardens.length; i++) {
             const w = s.wardens[i];
             const wr = 1.0;
             const dx = p.x - (w.x + 0.5);
             const dy = p.y - (w.y + 0.5);
             if (dx * dx + dy * dy <= wr * wr) {
-              w.hp -= s.damage;
-              if (w.hp <= 0) {
-                s.score += 60;
-                const nowK = performance.now();
-                s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
-                s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
-                s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
-                dropScraps(w.x + 0.5, w.y + 0.5, 8 + Math.floor(Math.random() * 5));
-                s.wardens.splice(i, 1);
-                syncHud();
-              }
+              s.score += 60;
+              const nowK = performance.now();
+              s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
+              s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
+              s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
+              dropScraps(w.x + 0.5, w.y + 0.5, 8 + Math.floor(Math.random() * 5));
+              s.wardens.splice(i, 1);
+              syncHud();
               return false;
             }
           }
