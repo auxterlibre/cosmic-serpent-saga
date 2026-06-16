@@ -1315,8 +1315,9 @@ function Game() {
             const nlen = Math.hypot(nx, ny) || 1;
             nx /= nlen;
             ny /= nlen;
-            const fleeSpeedMul = h.fleeing ? 1.15 : 1;
-            const move = Math.min(step * fleeSpeedMul, dist);
+            const boosted = h.boostUntil && performance.now() < h.boostUntil;
+            const speedMul = (h.fleeing ? 1.15 : 1) * (boosted ? 1.9 : 1);
+            const move = Math.min(step * speedMul, dist);
             h.x += nx * move;
             h.y += ny * move;
             const target = Math.atan2(ny, nx);
