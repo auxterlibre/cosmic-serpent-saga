@@ -1176,12 +1176,10 @@ function Game() {
           if (h.elite) {
             const phead = s.snake[0];
             if (phead && h.cooldown <= 0) {
-              const ELITE_FIRE_RANGE = 14;
               const ddx = phead.x - (h.x + 0.5);
               const ddy = phead.y - (h.y + 0.5);
               const ddist = Math.hypot(ddx, ddy);
               if (ddist < ELITE_FIRE_RANGE && ddist > 0.01) {
-                const ELITE_SHOT_SPEED = 13;
                 const vxH = Math.cos(s.headAngle) * s.playerSpeed;
                 const vyH = Math.sin(s.headAngle) * s.playerSpeed;
                 const tflight = ddist / ELITE_SHOT_SPEED;
@@ -1195,9 +1193,9 @@ function Game() {
                   y: h.y + 0.5,
                   vx: (adx / alen) * ELITE_SHOT_SPEED,
                   vy: (ady / alen) * ELITE_SHOT_SPEED,
-                  life: 3500,
+                  life: ELITE_SHOT_LIFE,
                 });
-                h.cooldown = 1400;
+                h.cooldown = ELITE_FIRE_INTERVAL;
               }
             }
             continue;
