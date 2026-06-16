@@ -123,6 +123,37 @@ function clearOfObstacles(p: Vec, pad = 1.5): boolean {
   return true;
 }
 
+// Steering away from asteroids — used by hunter/warden AI so they don't ram rocks.
+function obstacleAvoidance(x: number, y: number, lookahead: number): { ax: number; ay: number } {
+  let ax = 0, ay = 0;
+  for (const o of CURRENT_OBSTACLES) {
+    const cx = o.x + o.size / 2;
+    const cy = o.y + o.size / 2;
+    const r = o.size / 2 * 0.72 + lookahead;
+    const dx = x - cx, dy = y - cy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < r * r && d2 > 0.0001) {
+      const d = Math.sqrt(d2);
+      const w = (r - d) / r;
+      ax += (dx / d) * w;
+      ay += (dy / d) * w;
+    }
+  }
+  return { ax, ay };
+}
+
+// Returns true if a point lies inside any asteroid's solid hitbox.
+function pointInObstacle(x: number, y: number, pad = 0): boolean {
+  for (const o of CURRENT_OBSTACLES) {
+    const cx = o.x + o.size / 2;
+    const cy = o.y + o.size / 2;
+    const r = o.size / 2 * 0.72 + pad;
+    const dx = x - cx, dy = y - cy;
+    if (dx * dx + dy * dy <= r * r) return true;
+  }
+  return false;
+}
+
 const LOOT_MIN_SPACING = 4;
 function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
   for (let i = 0; i < 220; i++) {
