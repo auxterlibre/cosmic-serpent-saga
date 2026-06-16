@@ -987,7 +987,7 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
-          if (!h.elite && h.stolen.length >= 5) { h.elite = true; h.hp += 3; }
+          if (!h.elite && h.stolen.length >= 5) { h.elite = true; h.hp += 3; h.stolen.length = 0; h.trail.length = 0; }
 
 
           let tx: number, ty: number;
