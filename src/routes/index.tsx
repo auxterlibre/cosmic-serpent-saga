@@ -2383,6 +2383,23 @@ function Game() {
         ctx.beginPath();
         ctx.arc(1, 0, h.elite ? 2.2 : 1.8, 0, Math.PI * 2);
         ctx.fill();
+        // hit flash
+        if (h.hitT0) {
+          const age = performance.now() - h.hitT0;
+          if (age < 160) {
+            const a = (1 - age / 160) * 0.9;
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.beginPath();
+            ctx.moveTo(S + 2, 0);
+            ctx.lineTo(0, S - 1);
+            ctx.lineTo(-S + 2, S - 2);
+            ctx.lineTo(-S + 4, 0);
+            ctx.lineTo(-S + 2, -(S - 2));
+            ctx.lineTo(0, -(S - 1));
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
