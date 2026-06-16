@@ -1309,6 +1309,10 @@ function Game() {
           p.x += p.vx * stepDt;
           p.y += p.vy * stepDt;
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
+          if (pointInObstacle(p.x, p.y, 0)) {
+            s.explosions.push({ x: p.x, y: p.y, t0: performance.now() });
+            return false;
+          }
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
             const hr = HIT_R + Math.min(0.6, h.hp * 0.08);
