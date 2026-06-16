@@ -1052,12 +1052,11 @@ function Game() {
           } else if (h.elite && s.snake[0]) {
             // Elite hunters orbit the player at a standoff distance and fire at them.
             const playerHead = s.snake[0];
-            const ELITE_DIST = 9;
             const pdx = (h.x + 0.5) - playerHead.x;
             const pdy = (h.y + 0.5) - playerHead.y;
-            const pAng = Math.atan2(pdy, pdx) + 0.55; // tangential lead → circling
-            tx = playerHead.x + Math.cos(pAng) * ELITE_DIST;
-            ty = playerHead.y + Math.sin(pAng) * ELITE_DIST;
+            const pAng = Math.atan2(pdy, pdx) + ELITE_ORBIT_LEAD; // tangential lead → circling
+            tx = playerHead.x + Math.cos(pAng) * ELITE_ORBIT_DIST;
+            ty = playerHead.y + Math.sin(pAng) * ELITE_ORBIT_DIST;
           } else if (loot <= 0) {
             // No player cargo to steal — go after nearest loot in the world.
             let bestD = Infinity;
