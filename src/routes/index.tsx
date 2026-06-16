@@ -2311,11 +2311,54 @@ function Game() {
           drawCargoSegment(tx, ty, ang, t.color, false);
         }
 
+        // Elite transformation effect (rings + flash) rendered behind the ship
+        const MORPH_DUR = 700;
+        const morphE = h.morphT0 ? (performance.now() - h.morphT0) / MORPH_DUR : 1;
+        if (morphE < 1) {
+          ctx.save();
+          ctx.translate(cx, cy);
+          // expanding shockwave rings
+          for (let r = 0; r < 2; r++) {
+            const rE = Math.min(1, morphE + r * 0.18);
+            if (rE <= 0 || rE >= 1) continue;
+            const rad = 4 + rE * (CELL * 2.4);
+            ctx.strokeStyle = `rgba(254, 240, 138, ${(1 - rE) * 0.9})`;
+            ctx.lineWidth = 2.5 * (1 - rE) + 0.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, rad, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          // radial sparks
+          const sparkN = 8;
+          for (let i = 0; i < sparkN; i++) {
+            const a = (i / sparkN) * Math.PI * 2;
+            const len = CELL * 0.6 + morphE * CELL * 1.6;
+            const x0 = Math.cos(a) * (CELL * 0.4);
+            const y0 = Math.sin(a) * (CELL * 0.4);
+            const x1 = Math.cos(a) * len;
+            const y1 = Math.sin(a) * len;
+            ctx.strokeStyle = `rgba(252, 165, 165, ${(1 - morphE) * 0.85})`;
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(x0, y0);
+            ctx.lineTo(x1, y1);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        const eliteScale = h.elite ? ELITE_RENDER_SCALE : 1;
-        if (h.elite) ctx.scale(eliteScale, eliteScale);
+        // scale punch on morph: overshoots past elite scale, then settles
+        let eliteScale = h.elite ? ELITE_RENDER_SCALE : 1;
+        if (h.elite && morphE < 1) {
+          // 0..1 punch curve: starts at 1, overshoots to 1.45x ELITE, settles to 1
+          const p = morphE;
+          const punch = 1 + Math.sin(p * Math.PI) * 0.45 * (1 - p * 0.4);
+          eliteScale *= punch;
+        }
+        if (eliteScale !== 1) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
         const flareLen = 4 + Math.random() * 4;
@@ -2345,6 +2388,13 @@ function Game() {
         ctx.beginPath();
         ctx.arc(1, 0, h.elite ? 2.2 : 1.8, 0, Math.PI * 2);
         ctx.fill();
+        // white flash overlay during morph
+        if (h.elite && morphE < 1) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${(1 - morphE) * 0.55})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
         ctx.restore();
       }
 
