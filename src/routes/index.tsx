@@ -1955,7 +1955,7 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        const eliteScale = h.elite ? 1.35 : 1;
+        const eliteScale = h.elite ? 1.8 : 1;
         if (h.elite) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
