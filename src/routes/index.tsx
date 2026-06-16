@@ -1547,6 +1547,7 @@ function Game() {
             const dy = p.y - (h.y + 0.5);
             if (dx * dx + dy * dy <= hr * hr) {
               h.hp -= s.damage;
+              h.hitT0 = performance.now();
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
