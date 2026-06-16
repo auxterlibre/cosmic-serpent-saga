@@ -1326,7 +1326,7 @@ function Game() {
 
             // Stolen segments follow the hunter in a chain, mirroring the player's body movement.
             const HUNTER_HEAD_GAP = 0.7; // distance from hunter ship to first stolen segment
-            const HUNTER_TRAIL_GAP = 0.85; // distance between successive stolen segments
+            const HUNTER_TRAIL_GAP = SEG_SPACING; // distance between successive stolen segments
             // Sync trail length with stolen count; spawn new tail segments at the current tail's position.
             while (h.trail.length < h.stolen.length) {
               const tail = h.trail[h.trail.length - 1] ?? {
