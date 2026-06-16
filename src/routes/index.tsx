@@ -63,6 +63,7 @@ type Hunter = {
   fleeTarget: Vec | null;
   wanderTarget: Vec | null;
   hitT0?: number;
+  boostUntil?: number;
 };
 type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number; hitT0?: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
@@ -1314,8 +1315,9 @@ function Game() {
             const nlen = Math.hypot(nx, ny) || 1;
             nx /= nlen;
             ny /= nlen;
-            const fleeSpeedMul = h.fleeing ? 1.15 : 1;
-            const move = Math.min(step * fleeSpeedMul, dist);
+            const boosted = h.boostUntil && performance.now() < h.boostUntil;
+            const speedMul = (h.fleeing ? 1.15 : 1) * (boosted ? 1.9 : 1);
+            const move = Math.min(step * speedMul, dist);
             h.x += nx * move;
             h.y += ny * move;
             const target = Math.atan2(ny, nx);
@@ -1463,7 +1465,10 @@ function Game() {
                 h.stolen.push({ color: seg.color, rarity: rar });
               }
               // Brief cooldown after biting, then circle back and keep chasing — no flee.
+              // Brief cooldown after biting, then circle back and keep chasing — no flee.
               h.cooldown = 800;
+              // Adrenaline burst: 5s speed boost so the hunter can escape return fire.
+              h.boostUntil = performance.now() + 5000;
               h.fleeing = false;
               h.fleeTarget = null;
               syncHud();
