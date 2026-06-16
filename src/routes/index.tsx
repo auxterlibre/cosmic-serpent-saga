@@ -2451,6 +2451,28 @@ function Game() {
             ctx.fill();
           }
         }
+        // transformation aura — pulses brighter as smash approaches
+        if (h.eliteT0 !== undefined) {
+          const age = performance.now() - h.eliteT0;
+          const t = Math.min(1, age / ELITE_TRANSFORM_DURATION);
+          const pulse = 0.5 + 0.5 * Math.sin(age * 0.025);
+          const aura = ctx.createRadialGradient(0, 0, 2, 0, 0, CELL * 3);
+          aura.addColorStop(0, `rgba(254, 240, 138, ${0.35 + 0.5 * t})`);
+          aura.addColorStop(0.5, `rgba(220, 38, 38, ${0.18 + 0.4 * t * pulse})`);
+          aura.addColorStop(1, "rgba(220, 38, 38, 0)");
+          ctx.fillStyle = aura;
+          ctx.beginPath();
+          ctx.arc(0, 0, CELL * 3, 0, Math.PI * 2);
+          ctx.fill();
+          // bright shockwave at smash moment
+          if (t > 0.85) {
+            const k = (t - 0.85) / 0.15;
+            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - k) * 0.9})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, CELL * (0.5 + k * 2.5), 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
