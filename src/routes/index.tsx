@@ -211,6 +211,38 @@ function pointInObstacle(x: number, y: number, pad = 0): boolean {
   return false;
 }
 
+// Shatter a destroyed cargo segment into colored debris chunks — same system
+// as asteroids, just sized for the segment and tinted to its rarity color.
+function shatterSegment(debris: Debris[], x: number, y: number, color: string, t0: number) {
+  const hex = color.replace("#", "");
+  const r = parseInt(hex.slice(0, 2), 16) || 180;
+  const g = parseInt(hex.slice(2, 4), 16) || 180;
+  const b = parseInt(hex.slice(4, 6), 16) || 180;
+  const baseFill = `rgb(${r},${g},${b})`;
+  const craterC = `rgb(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)})`;
+  const seedBase = ((Math.floor(x * 100) * 73856093) ^ (Math.floor(y * 100) * 19349663)) >>> 0;
+  const pieces = 5;
+  for (let k = 0; k < pieces; k++) {
+    const a = (k / pieces) * Math.PI * 2 + Math.random() * 0.8;
+    const sp = 1.6 + Math.random() * 2.4;
+    debris.push({
+      x: x + Math.cos(a) * 0.1,
+      y: y + Math.sin(a) * 0.1,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 7,
+      size: 0.22 + Math.random() * 0.2,
+      t0,
+      seed: (seedBase + k * 2654435761) >>> 0,
+      baseFill,
+      craterC,
+    });
+  }
+}
+
+
+
 const LOOT_MIN_SPACING = 4;
 function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
   for (let i = 0; i < 220; i++) {
@@ -1037,13 +1069,16 @@ function Game() {
           // Blow up every cargo segment in sequence from head to tail, then clear the train.
           for (let k = 1; k < s.snake.length; k++) {
             const seg = s.snake[k];
+            const segT = now + 40 + k * 90;
             s.explosions.push({
               x: seg.x + (Math.random() - 0.5) * 0.4,
               y: seg.y + (Math.random() - 0.5) * 0.4,
-              t0: now + 40 + k * 90,
+              t0: segT,
             });
+            shatterSegment(s.debris, seg.x, seg.y, seg.color, segT);
           }
           s.snake = [];
+
           // Shatter the asteroid into debris chunks.
           const seed = ((Math.floor(o.x * 100) * 73856093) ^ (Math.floor(o.y * 100) * 19349663)) >>> 0;
           const tintRoll = (seed % 1000) / 1000;
@@ -1391,12 +1426,15 @@ function Game() {
               // Chain-detonate the cargo train from head to tail.
               for (let k = 1; k < s.snake.length; k++) {
                 const seg = s.snake[k];
+                const segT = now + 80 + k * 90;
                 s.explosions.push({
                   x: seg.x + (Math.random() - 0.5) * 0.4,
                   y: seg.y + (Math.random() - 0.5) * 0.4,
-                  t0: now + 80 + k * 90,
+                  t0: segT,
                 });
+                shatterSegment(s.debris, seg.x, seg.y, seg.color, segT);
               }
+
               s.snake = [];
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
@@ -1668,11 +1706,13 @@ function Game() {
                   s.explosions.push({ x: seg.x, y: seg.y, t0: now });
                   for (let k = 1; k < s.snake.length; k++) {
                     const sg = s.snake[k];
+                    const segT = now + 60 + k * 80;
                     s.explosions.push({
                       x: sg.x + (Math.random() - 0.5) * 0.4,
                       y: sg.y + (Math.random() - 0.5) * 0.4,
-                      t0: now + 60 + k * 80,
+                      t0: segT,
                     });
+                    shatterSegment(s.debris, sg.x, sg.y, sg.color, segT);
                   }
                   s.snake = [];
                   s.alive = false;
@@ -1682,6 +1722,8 @@ function Game() {
                   // is released back into space as collectible loot.
                   const removed = s.snake.splice(i);
                   s.explosions.push({ x: removed[0].x, y: removed[0].y, t0: now });
+                  shatterSegment(s.debris, removed[0].x, removed[0].y, removed[0].color, now);
+
                   for (let k = 1; k < removed.length; k++) {
                     const sg = removed[k];
                     let rar: Rarity = "common";
