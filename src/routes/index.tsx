@@ -1129,6 +1129,36 @@ function Game() {
             continue;
           }
 
+          if (h.elite) {
+            const phead = s.snake[0];
+            if (phead && h.cooldown <= 0) {
+              const ELITE_FIRE_RANGE = 14;
+              const ddx = phead.x - (h.x + 0.5);
+              const ddy = phead.y - (h.y + 0.5);
+              const ddist = Math.hypot(ddx, ddy);
+              if (ddist < ELITE_FIRE_RANGE && ddist > 0.01) {
+                const ELITE_SHOT_SPEED = 13;
+                const vxH = Math.cos(s.headAngle) * s.playerSpeed;
+                const vyH = Math.sin(s.headAngle) * s.playerSpeed;
+                const tflight = ddist / ELITE_SHOT_SPEED;
+                const aimX = phead.x + vxH * tflight * 0.5;
+                const aimY = phead.y + vyH * tflight * 0.5;
+                const adx = aimX - (h.x + 0.5);
+                const ady = aimY - (h.y + 0.5);
+                const alen = Math.hypot(adx, ady) || 1;
+                s.wardenShots.push({
+                  x: h.x + 0.5,
+                  y: h.y + 0.5,
+                  vx: (adx / alen) * ELITE_SHOT_SPEED,
+                  vy: (ady / alen) * ELITE_SHOT_SPEED,
+                  life: 3500,
+                });
+                h.cooldown = 1400;
+              }
+            }
+            continue;
+          }
+
           if (h.cooldown <= 0 && loot > 0) {
             const hsize = 0.5 + Math.min(0.6, h.hp * 0.08);
             const reach = (hsize + 0.4) * (hsize + 0.4);
