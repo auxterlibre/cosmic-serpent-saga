@@ -211,6 +211,38 @@ function pointInObstacle(x: number, y: number, pad = 0): boolean {
   return false;
 }
 
+// Shatter a destroyed cargo segment into colored debris chunks — same system
+// as asteroids, just sized for the segment and tinted to its rarity color.
+function shatterSegment(debris: Debris[], x: number, y: number, color: string, t0: number) {
+  const hex = color.replace("#", "");
+  const r = parseInt(hex.slice(0, 2), 16) || 180;
+  const g = parseInt(hex.slice(2, 4), 16) || 180;
+  const b = parseInt(hex.slice(4, 6), 16) || 180;
+  const baseFill = `rgb(${r},${g},${b})`;
+  const craterC = `rgb(${Math.round(r * 0.5)},${Math.round(g * 0.5)},${Math.round(b * 0.5)})`;
+  const seedBase = ((Math.floor(x * 100) * 73856093) ^ (Math.floor(y * 100) * 19349663)) >>> 0;
+  const pieces = 5;
+  for (let k = 0; k < pieces; k++) {
+    const a = (k / pieces) * Math.PI * 2 + Math.random() * 0.8;
+    const sp = 1.6 + Math.random() * 2.4;
+    debris.push({
+      x: x + Math.cos(a) * 0.1,
+      y: y + Math.sin(a) * 0.1,
+      vx: Math.cos(a) * sp,
+      vy: Math.sin(a) * sp,
+      rot: Math.random() * Math.PI * 2,
+      vr: (Math.random() - 0.5) * 7,
+      size: 0.22 + Math.random() * 0.2,
+      t0,
+      seed: (seedBase + k * 2654435761) >>> 0,
+      baseFill,
+      craterC,
+    });
+  }
+}
+
+
+
 const LOOT_MIN_SPACING = 4;
 function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
   for (let i = 0; i < 220; i++) {
