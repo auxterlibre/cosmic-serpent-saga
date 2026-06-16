@@ -560,8 +560,10 @@ function Game() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.key === "r" || e.key === "R") && (e.shiftKey || e.ctrlKey || e.metaKey) && !stateRef.current.alive) {
-        reset();
+      if ((e.key === "r" || e.key === "R") && (e.shiftKey || e.ctrlKey || e.metaKey)) {
+        // Prevent macOS Cmd+R / Ctrl+R from reloading the page mid-game
+        e.preventDefault();
+        if (!stateRef.current.alive) reset();
         return;
       }
       if (e.key === "Escape") {
