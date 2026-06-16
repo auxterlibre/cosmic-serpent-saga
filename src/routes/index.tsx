@@ -1426,12 +1426,15 @@ function Game() {
               // Chain-detonate the cargo train from head to tail.
               for (let k = 1; k < s.snake.length; k++) {
                 const seg = s.snake[k];
+                const segT = now + 80 + k * 90;
                 s.explosions.push({
                   x: seg.x + (Math.random() - 0.5) * 0.4,
                   y: seg.y + (Math.random() - 0.5) * 0.4,
-                  t0: now + 80 + k * 90,
+                  t0: segT,
                 });
+                shatterSegment(s.debris, seg.x, seg.y, seg.color, segT);
               }
+
               s.snake = [];
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) s.hunters.splice(idx, 1);
