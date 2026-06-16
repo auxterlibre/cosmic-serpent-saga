@@ -39,7 +39,7 @@ const ELITE_SHOT_LIFE = 3500;
 const ELITE_RENDER_SCALE = 1.8;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
-const WARDEN_HP = 5;
+const HIT_FLASH_MS = 150;
 const WARDEN_FIRE_INTERVAL = 2200;
 const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
 const WARDEN_PREFERRED_DIST = 12;
