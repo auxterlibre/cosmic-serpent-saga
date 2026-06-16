@@ -20,11 +20,20 @@ const TURN_RATE = 8.5;
 const SEG_SPACING = 1.15;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
-const HUNTER_MIN = 1;
 const HUNTER_MAX = 60;
 const HUNTER_PER_LOOT = 2 / 3; // +1 hunter per 1.5 loot segments carried
 const HUNTER_SPEED = 4.6;
-const CHECKPOINT_COUNT = 5;
+// Elite hunter: upgraded form that hunts and shoots the player.
+const ELITE_UPGRADE_SEGMENTS = 5;      // stolen segments needed to upgrade
+const ELITE_HP_BONUS = 3;              // extra HP granted on upgrade
+const ELITE_UPGRADE_COOLDOWN = 600;    // ms before elite can fire after upgrading
+const ELITE_ORBIT_DIST = 9;            // standoff distance from player
+const ELITE_ORBIT_LEAD = 0.55;         // tangential angle offset → circling motion
+const ELITE_FIRE_RANGE = 14;
+const ELITE_SHOT_SPEED = 13;
+const ELITE_FIRE_INTERVAL = 1400;
+const ELITE_SHOT_LIFE = 3500;
+const ELITE_RENDER_SCALE = 1.8;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 3;
