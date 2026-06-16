@@ -1464,7 +1464,10 @@ function Game() {
                 h.stolen.push({ color: seg.color, rarity: rar });
               }
               // Brief cooldown after biting, then circle back and keep chasing — no flee.
+              // Brief cooldown after biting, then circle back and keep chasing — no flee.
               h.cooldown = 800;
+              // Adrenaline burst: 5s speed boost so the hunter can escape return fire.
+              h.boostUntil = performance.now() + 5000;
               h.fleeing = false;
               h.fleeTarget = null;
               syncHud();
