@@ -39,7 +39,7 @@ const ELITE_SHOT_LIFE = 3500;
 const ELITE_RENDER_SCALE = 1.8;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
-const WARDEN_HP = 5;
+const HIT_FLASH_MS = 150;
 const WARDEN_FIRE_INTERVAL = 2200;
 const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
 const WARDEN_PREFERRED_DIST = 12;
@@ -63,8 +63,9 @@ type Hunter = {
   fleeTarget: Vec | null;
   wanderTarget: Vec | null;
   morphT0?: number;
+  hitT0?: number;
 };
-type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number };
+type Warden = { x: number; y: number; angle: number; cooldown: number; hitT0?: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type WardenShot = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
@@ -1543,6 +1544,7 @@ function Game() {
             const dy = p.y - (h.y + 0.5);
             if (dx * dx + dy * dy <= hr * hr) {
               h.hp -= s.damage;
+              h.hitT0 = performance.now();
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
@@ -1565,24 +1567,21 @@ function Game() {
               return false;
             }
           }
-          // Player projectiles also damage wardens.
+          // Player projectiles destroy wardens in a single hit.
           for (let i = 0; i < s.wardens.length; i++) {
             const w = s.wardens[i];
             const wr = 1.0;
             const dx = p.x - (w.x + 0.5);
             const dy = p.y - (w.y + 0.5);
             if (dx * dx + dy * dy <= wr * wr) {
-              w.hp -= s.damage;
-              if (w.hp <= 0) {
-                s.score += 60;
-                const nowK = performance.now();
-                s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
-                s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
-                s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
-                dropScraps(w.x + 0.5, w.y + 0.5, 8 + Math.floor(Math.random() * 5));
-                s.wardens.splice(i, 1);
-                syncHud();
-              }
+              s.score += 60;
+              const nowK = performance.now();
+              s.explosions.push({ x: w.x + 0.5, y: w.y + 0.5, t0: nowK });
+              s.explosions.push({ x: w.x + 0.5 + 0.4, y: w.y + 0.5 - 0.3, t0: nowK + 90 });
+              s.explosions.push({ x: w.x + 0.5 - 0.3, y: w.y + 0.5 + 0.4, t0: nowK + 180 });
+              dropScraps(w.x + 0.5, w.y + 0.5, 8 + Math.floor(Math.random() * 5));
+              s.wardens.splice(i, 1);
+              syncHud();
               return false;
             }
           }
@@ -1612,7 +1611,7 @@ function Game() {
               if (ok) break;
               pos = randPlayablePosAway(s.snake[0] ?? START);
             }
-            s.wardens.push({ x: pos.x, y: pos.y, angle: 0, hp: WARDEN_HP, cooldown: 1500 });
+            s.wardens.push({ x: pos.x, y: pos.y, angle: 0, cooldown: 1500 });
           }
         }
         const head = s.snake[0];
@@ -2395,6 +2394,16 @@ function Game() {
           ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
           ctx.fill();
         }
+        // white flash overlay when hit
+        if (h.hitT0) {
+          const fE = (performance.now() - h.hitT0) / HIT_FLASH_MS;
+          if (fE < 1) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - fE) * 0.85})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, S + 2, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
@@ -2453,19 +2462,17 @@ function Game() {
         ctx.beginPath();
         ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
         ctx.fill();
-        // HP pip ring
+        // hit flash overlay
+        if (w.hitT0) {
+          const fE = (performance.now() - w.hitT0) / HIT_FLASH_MS;
+          if (fE < 1) {
+            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - fE) * 0.7})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, R * 1.05, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
         ctx.restore();
-        const hpFrac = Math.max(0, w.hp / WARDEN_HP);
-        ctx.strokeStyle = "rgba(20,20,30,0.7)";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(cx, cy, R * 1.25, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.strokeStyle = "#ef4444";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, R * 1.25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpFrac);
-        ctx.stroke();
       }
 
       // ---- Warden shots: chunky orange plasma ----
