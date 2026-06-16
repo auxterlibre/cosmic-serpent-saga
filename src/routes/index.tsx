@@ -204,7 +204,7 @@ function pointInObstacle(x: number, y: number, pad = 0): boolean {
   for (const o of CURRENT_OBSTACLES) {
     const cx = o.x + o.size / 2;
     const cy = o.y + o.size / 2;
-    const r = (o.size / 2) * 0.72 + pad;
+    const r = (o.size / 2) * 0.88 + pad;
     const dx = x - cx,
       dy = y - cy;
     if (dx * dx + dy * dy <= r * r) return true;
@@ -1022,10 +1022,9 @@ function Game() {
         const cy = o.y + size / 2;
         const dx = cx - hx;
         const dy = cy - hy;
-        // Tight hitbox: asteroid silhouette is jagged (vertices at 0.7–1.02 of
-        // the bounding radius). Use a radius near the inner trough so the
-        // player only dies when actually touching the visible rock.
-        const r = (size / 2) * 0.72;
+        // Hitbox slightly inside the visible silhouette (visual ≈ 0.85–1.0 of
+        // bounding radius; hitbox at 0.88 just under the silhouette).
+        const r = (size / 2) * 0.88;
         if (dx * dx + dy * dy <= r * r) {
           // Instant death on any asteroid hit.
           const now = performance.now();
