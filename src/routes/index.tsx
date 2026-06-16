@@ -1231,7 +1231,14 @@ function Game() {
           }
 
           let tx: number, ty: number;
-          if (h.fleeing) {
+          if (s.fieldActive) {
+            // Player is inside a checkpoint force field — enemies cannot lock on; they roam.
+            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+            }
+            tx = h.wanderTarget.x;
+            ty = h.wanderTarget.y;
+          } else if (h.fleeing) {
             if (!h.fleeTarget) {
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
               const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
