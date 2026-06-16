@@ -1325,12 +1325,13 @@ function Game() {
             h.angle += diff * Math.min(1, dtSec * 8);
 
             // Stolen segments follow the hunter in a chain, mirroring the player's body movement.
-            const HUNTER_TRAIL_GAP = SEG_SPACING;
+            const HUNTER_HEAD_GAP = 0.7; // distance from hunter ship to first stolen segment
+            const HUNTER_TRAIL_GAP = 0.85; // distance between successive stolen segments
             // Sync trail length with stolen count; spawn new tail segments at the current tail's position.
             while (h.trail.length < h.stolen.length) {
               const tail = h.trail[h.trail.length - 1] ?? {
-                x: h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP,
-                y: h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP,
+                x: h.x - Math.cos(h.angle) * HUNTER_HEAD_GAP,
+                y: h.y - Math.sin(h.angle) * HUNTER_HEAD_GAP,
               };
               h.trail.push({ x: tail.x, y: tail.y, color: SEG_COLOR_DEFAULT, rarity: "common" });
             }
@@ -1341,16 +1342,17 @@ function Game() {
               h.trail[ti].rarity = st?.rarity ?? "common";
             }
             // Chain-follow: each segment is pulled toward the one in front of it.
-            const anchorX = h.x - Math.cos(h.angle) * HUNTER_TRAIL_GAP;
-            const anchorY = h.y - Math.sin(h.angle) * HUNTER_TRAIL_GAP;
+            const anchorX = h.x - Math.cos(h.angle) * HUNTER_HEAD_GAP;
+            const anchorY = h.y - Math.sin(h.angle) * HUNTER_HEAD_GAP;
             for (let ti = 0; ti < h.trail.length; ti++) {
               const prev = ti === 0 ? { x: anchorX, y: anchorY } : h.trail[ti - 1];
               const cur = h.trail[ti];
               const ddx = prev.x - cur.x;
               const ddy = prev.y - cur.y;
               const dd = Math.hypot(ddx, ddy);
-              if (dd > SEG_SPACING && dd > 0) {
-                const k = (dd - SEG_SPACING) / dd;
+              const gap = ti === 0 ? HUNTER_HEAD_GAP : HUNTER_TRAIL_GAP;
+              if (dd > gap && dd > 0) {
+                const k = (dd - gap) / dd;
                 cur.x += ddx * k;
                 cur.y += ddy * k;
               }
