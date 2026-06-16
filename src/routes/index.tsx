@@ -1838,6 +1838,42 @@ function Game() {
         if (px < -CELL * 4 || py < -CELL * 4 || px > wViewW + CELL * 3 || py > wViewH + CELL * 3) continue;
         const cx = px + CELL / 2;
         const cy = py + CELL / 2;
+
+        // ---- Force field shield around the station ----
+        {
+          const FIELD_R = 7;
+          const fieldPx = FIELD_R * CELL;
+          const active = s.fieldActive;
+          const breathe = 0.5 + 0.5 * Math.sin(tStation / 420);
+          const alphaFill = active ? 0.18 + 0.08 * breathe : 0.07 + 0.04 * breathe;
+          const alphaRing = active ? 0.85 : 0.45;
+          const grd = ctx.createRadialGradient(cx, cy, fieldPx * 0.55, cx, cy, fieldPx);
+          grd.addColorStop(0, `rgba(96, 200, 255, 0)`);
+          grd.addColorStop(0.75, `rgba(96, 200, 255, ${alphaFill * 0.5})`);
+          grd.addColorStop(1, `rgba(160, 230, 255, ${alphaFill})`);
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(cx, cy, fieldPx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.save();
+          ctx.strokeStyle = `rgba(140, 220, 255, ${alphaRing})`;
+          ctx.lineWidth = active ? 2.4 : 1.4;
+          ctx.setLineDash([6, 8]);
+          ctx.lineDashOffset = -tStation / 60;
+          ctx.beginPath();
+          ctx.arc(cx, cy, fieldPx, 0, Math.PI * 2);
+          ctx.stroke();
+          if (active) {
+            ctx.strokeStyle = `rgba(200, 240, 255, 0.5)`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(cx, cy, fieldPx * (0.92 + 0.06 * breathe), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
         // deterministic per-station seed so each looks unique but stable
         const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
         const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
