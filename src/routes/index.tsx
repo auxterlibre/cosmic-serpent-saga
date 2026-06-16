@@ -20,11 +20,20 @@ const TURN_RATE = 8.5;
 const SEG_SPACING = 1.15;
 const LOOT_COUNT = 30;
 const OBSTACLE_COUNT = 18;
-const HUNTER_MIN = 1;
 const HUNTER_MAX = 60;
 const HUNTER_PER_LOOT = 2 / 3; // +1 hunter per 1.5 loot segments carried
 const HUNTER_SPEED = 4.6;
-const CHECKPOINT_COUNT = 5;
+// Elite hunter: upgraded form that hunts and shoots the player.
+const ELITE_UPGRADE_SEGMENTS = 5;      // stolen segments needed to upgrade
+const ELITE_HP_BONUS = 3;              // extra HP granted on upgrade
+const ELITE_UPGRADE_COOLDOWN = 600;    // ms before elite can fire after upgrading
+const ELITE_ORBIT_DIST = 9;            // standoff distance from player
+const ELITE_ORBIT_LEAD = 0.55;         // tangential angle offset → circling motion
+const ELITE_FIRE_RANGE = 14;
+const ELITE_SHOT_SPEED = 13;
+const ELITE_FIRE_INTERVAL = 1400;
+const ELITE_SHOT_LIFE = 3500;
+const ELITE_RENDER_SCALE = 1.8;
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 3;
@@ -1018,16 +1027,16 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
-          if (!h.elite && h.stolen.length >= 5) {
+          if (!h.elite && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
             h.elite = true;
-            h.hp += 3;
+            h.hp += ELITE_HP_BONUS;
             h.stolen.length = 0;
             h.trail.length = 0;
             // Becoming elite cancels any flee state — it now hunts the player aggressively.
             h.fleeing = false;
             h.fleeTarget = null;
             h.wanderTarget = null;
-            h.cooldown = 600;
+            h.cooldown = ELITE_UPGRADE_COOLDOWN;
           }
 
 
@@ -1043,12 +1052,11 @@ function Game() {
           } else if (h.elite && s.snake[0]) {
             // Elite hunters orbit the player at a standoff distance and fire at them.
             const playerHead = s.snake[0];
-            const ELITE_DIST = 9;
             const pdx = (h.x + 0.5) - playerHead.x;
             const pdy = (h.y + 0.5) - playerHead.y;
-            const pAng = Math.atan2(pdy, pdx) + 0.55; // tangential lead → circling
-            tx = playerHead.x + Math.cos(pAng) * ELITE_DIST;
-            ty = playerHead.y + Math.sin(pAng) * ELITE_DIST;
+            const pAng = Math.atan2(pdy, pdx) + ELITE_ORBIT_LEAD; // tangential lead → circling
+            tx = playerHead.x + Math.cos(pAng) * ELITE_ORBIT_DIST;
+            ty = playerHead.y + Math.sin(pAng) * ELITE_ORBIT_DIST;
           } else if (loot <= 0) {
             // No player cargo to steal — go after nearest loot in the world.
             let bestD = Infinity;
@@ -1168,12 +1176,10 @@ function Game() {
           if (h.elite) {
             const phead = s.snake[0];
             if (phead && h.cooldown <= 0) {
-              const ELITE_FIRE_RANGE = 14;
               const ddx = phead.x - (h.x + 0.5);
               const ddy = phead.y - (h.y + 0.5);
               const ddist = Math.hypot(ddx, ddy);
               if (ddist < ELITE_FIRE_RANGE && ddist > 0.01) {
-                const ELITE_SHOT_SPEED = 13;
                 const vxH = Math.cos(s.headAngle) * s.playerSpeed;
                 const vyH = Math.sin(s.headAngle) * s.playerSpeed;
                 const tflight = ddist / ELITE_SHOT_SPEED;
@@ -1187,9 +1193,9 @@ function Game() {
                   y: h.y + 0.5,
                   vx: (adx / alen) * ELITE_SHOT_SPEED,
                   vy: (ady / alen) * ELITE_SHOT_SPEED,
-                  life: 3500,
+                  life: ELITE_SHOT_LIFE,
                 });
-                h.cooldown = 1400;
+                h.cooldown = ELITE_FIRE_INTERVAL;
               }
             }
             continue;
@@ -2062,7 +2068,7 @@ function Game() {
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(h.angle);
-        const eliteScale = h.elite ? 1.8 : 1;
+        const eliteScale = h.elite ? ELITE_RENDER_SCALE : 1;
         if (h.elite) ctx.scale(eliteScale, eliteScale);
         const S = CELL / 2;
         // thruster flare
@@ -2468,7 +2474,7 @@ function Game() {
 
         // palette — industrial orange + gunmetal
         const ORANGE = "#d96b2a";
-        const ORANGE_DK = "#8a3f15";
+        
         const GREY = "#5a606a";
         const GREY_LT = "#8a8f98";
         const GREY_DK = "#2e3238";
