@@ -1180,6 +1180,42 @@ function Game() {
           a.y = Math.max(0, Math.min(WORLD_H - 1, a.y));
         }
 
+        // ---- Checkpoint force field: scatters hunter cargo and forces them to roam.
+        const FIELD_R = 7;
+        const FIELD_R2 = FIELD_R * FIELD_R;
+        const pHead = s.snake[0];
+        let inField = false;
+        if (pHead) {
+          for (const cp of s.checkpoints) {
+            const dxh = cp.x + 0.5 - pHead.x;
+            const dyh = cp.y + 0.5 - pHead.y;
+            if (dxh * dxh + dyh * dyh <= FIELD_R2) {
+              inField = true;
+              break;
+            }
+          }
+        }
+        if (inField && !s.fieldActive) {
+          for (const h of s.hunters) {
+            for (const seg of h.stolen) {
+              const jx = (Math.random() - 0.5) * 1.4;
+              const jy = (Math.random() - 0.5) * 1.4;
+              s.loot.push({
+                x: Math.max(0, Math.min(WORLD_W - 1, h.x + jx)),
+                y: Math.max(0, Math.min(WORLD_H - 1, h.y + jy)),
+                color: seg.color,
+                rarity: seg.rarity,
+              });
+            }
+            h.stolen.length = 0;
+            h.trail.length = 0;
+            h.fleeing = false;
+            h.fleeTarget = null;
+            h.wanderTarget = null;
+          }
+        }
+        s.fieldActive = inField;
+
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
           if (!h.elite && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
