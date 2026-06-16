@@ -472,6 +472,7 @@ function initialState() {
     paused: true,
     shopOpen: false,
     cpCooldown: new Set<number>(),
+    fieldActive: false,
     manualPause: true,
     keys: new Set<string>(),
   };
