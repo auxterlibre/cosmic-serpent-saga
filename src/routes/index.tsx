@@ -1009,9 +1009,9 @@ function Game() {
             }
             tx = h.fleeTarget.x + 0.5;
             ty = h.fleeTarget.y + 0.5;
-          const playerHead = s.snake[0];
-          if (h.elite && playerHead) {
+          } else if (h.elite && s.snake[0]) {
             // Elite hunters orbit the player at a standoff distance and fire at them.
+            const playerHead = s.snake[0];
             const ELITE_DIST = 9;
             const pdx = (h.x + 0.5) - playerHead.x;
             const pdy = (h.y + 0.5) - playerHead.y;
