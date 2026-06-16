@@ -2356,19 +2356,7 @@ function Game() {
         ctx.beginPath();
         ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
         ctx.fill();
-        // HP pip ring
         ctx.restore();
-        const hpFrac = Math.max(0, w.hp / WARDEN_HP);
-        ctx.strokeStyle = "rgba(20,20,30,0.7)";
-        ctx.lineWidth = 4;
-        ctx.beginPath();
-        ctx.arc(cx, cy, R * 1.25, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.strokeStyle = "#ef4444";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(cx, cy, R * 1.25, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hpFrac);
-        ctx.stroke();
       }
 
       // ---- Warden shots: chunky orange plasma ----
