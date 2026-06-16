@@ -2474,7 +2474,7 @@ function Game() {
 
         // palette — industrial orange + gunmetal
         const ORANGE = "#d96b2a";
-        const ORANGE_DK = "#8a3f15";
+        
         const GREY = "#5a606a";
         const GREY_LT = "#8a8f98";
         const GREY_DK = "#2e3238";
