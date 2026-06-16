@@ -1181,9 +1181,7 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
-          // Fleeing hunters must escape with their loot first — they can only upgrade
-          // once they've disengaged (or accumulated enough via opportunistic pickups).
-          if (!h.elite && !h.fleeing && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
+          if (!h.elite && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
             h.elite = true;
             h.hp += ELITE_HP_BONUS;
             h.stolen.length = 0;
