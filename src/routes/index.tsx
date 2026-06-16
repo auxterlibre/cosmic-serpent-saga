@@ -1229,6 +1229,7 @@ function Game() {
             h.fleeTarget = null;
             h.wanderTarget = null;
             h.cooldown = ELITE_UPGRADE_COOLDOWN;
+            h.morphT0 = performance.now();
           }
 
           let tx: number, ty: number;
