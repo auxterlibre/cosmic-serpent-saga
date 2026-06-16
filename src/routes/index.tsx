@@ -37,6 +37,7 @@ const ELITE_SHOT_SPEED = 13;
 const ELITE_FIRE_INTERVAL = 1400;
 const ELITE_SHOT_LIFE = 3500;
 const ELITE_RENDER_SCALE = 1.8;
+const ELITE_TRANSFORM_DURATION = 1800; // ms — segments orbit then smash inward
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 5;
@@ -64,6 +65,7 @@ type Hunter = {
   wanderTarget: Vec | null;
   hitT0?: number;
   boostUntil?: number;
+  eliteT0?: number; // start time of elite transformation animation
 };
 type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number; hitT0?: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
@@ -1219,16 +1221,60 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
+
+          // Elite transformation: freeze in place, segments orbit then smash into the hunter.
+          if (h.eliteT0 !== undefined) {
+            const age = performance.now() - h.eliteT0;
+            if (age >= ELITE_TRANSFORM_DURATION) {
+              h.elite = true;
+              h.hp += ELITE_HP_BONUS;
+              h.stolen.length = 0;
+              h.trail.length = 0;
+              h.fleeing = false;
+              h.fleeTarget = null;
+              h.wanderTarget = null;
+              h.cooldown = ELITE_UPGRADE_COOLDOWN;
+              h.eliteT0 = undefined;
+              s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
+            } else {
+              // Make sure trail has a slot per stolen segment.
+              while (h.trail.length < h.stolen.length) {
+                const idx = h.trail.length;
+                h.trail.push({
+                  x: h.x,
+                  y: h.y,
+                  color: h.stolen[idx]?.color ?? SEG_COLOR_DEFAULT,
+                  rarity: h.stolen[idx]?.rarity ?? "common",
+                });
+              }
+              const t = age / ELITE_TRANSFORM_DURATION;
+              const phase1 = 0.6;
+              const radius = 2.6;
+              const n = Math.max(1, h.trail.length);
+              for (let i = 0; i < h.trail.length; i++) {
+                const ang = (i / n) * Math.PI * 2 + age * 0.004;
+                let r: number;
+                if (t < phase1) {
+                  const k = t / phase1;
+                  r = radius * (1 - Math.pow(1 - k, 3));
+                } else {
+                  const k = (t - phase1) / (1 - phase1);
+                  r = radius * (1 - Math.pow(k, 2.2));
+                }
+                h.trail[i].x = h.x + Math.cos(ang) * r;
+                h.trail[i].y = h.y + Math.sin(ang) * r;
+              }
+              continue;
+            }
+          }
+
           if (!h.elite && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
-            h.elite = true;
-            h.hp += ELITE_HP_BONUS;
-            h.stolen.length = 0;
-            h.trail.length = 0;
-            // Becoming elite cancels any flee state — it now hunts the player aggressively.
+            h.eliteT0 = performance.now();
             h.fleeing = false;
             h.fleeTarget = null;
             h.wanderTarget = null;
-            h.cooldown = ELITE_UPGRADE_COOLDOWN;
+            h.boostUntil = undefined;
+            continue;
           }
 
           let tx: number, ty: number;
@@ -1546,6 +1592,7 @@ function Game() {
           }
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
+            if (h.eliteT0 !== undefined) continue; // invulnerable during transformation
             const hr = HIT_R + Math.min(0.6, h.hp * 0.08);
             const dx = p.x - (h.x + 0.5);
             const dy = p.y - (h.y + 0.5);
@@ -2401,6 +2448,28 @@ function Game() {
             ctx.lineTo(-S + 2, -(S - 2));
             ctx.lineTo(0, -(S - 1));
             ctx.closePath();
+            ctx.fill();
+          }
+        }
+        // transformation aura — pulses brighter as smash approaches
+        if (h.eliteT0 !== undefined) {
+          const age = performance.now() - h.eliteT0;
+          const t = Math.min(1, age / ELITE_TRANSFORM_DURATION);
+          const pulse = 0.5 + 0.5 * Math.sin(age * 0.025);
+          const aura = ctx.createRadialGradient(0, 0, 2, 0, 0, CELL * 3);
+          aura.addColorStop(0, `rgba(254, 240, 138, ${0.35 + 0.5 * t})`);
+          aura.addColorStop(0.5, `rgba(220, 38, 38, ${0.18 + 0.4 * t * pulse})`);
+          aura.addColorStop(1, "rgba(220, 38, 38, 0)");
+          ctx.fillStyle = aura;
+          ctx.beginPath();
+          ctx.arc(0, 0, CELL * 3, 0, Math.PI * 2);
+          ctx.fill();
+          // bright shockwave at smash moment
+          if (t > 0.85) {
+            const k = (t - 0.85) / 0.15;
+            ctx.fillStyle = `rgba(255, 255, 255, ${(1 - k) * 0.9})`;
+            ctx.beginPath();
+            ctx.arc(0, 0, CELL * (0.5 + k * 2.5), 0, Math.PI * 2);
             ctx.fill();
           }
         }
