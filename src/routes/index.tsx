@@ -63,6 +63,7 @@ type Hunter = {
   fleeTarget: Vec | null;
   wanderTarget: Vec | null;
   morphT0?: number;
+  hitT0?: number;
 };
 type Warden = { x: number; y: number; angle: number; cooldown: number; hitT0?: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
