@@ -123,6 +123,37 @@ function clearOfObstacles(p: Vec, pad = 1.5): boolean {
   return true;
 }
 
+// Steering away from asteroids — used by hunter/warden AI so they don't ram rocks.
+function obstacleAvoidance(x: number, y: number, lookahead: number): { ax: number; ay: number } {
+  let ax = 0, ay = 0;
+  for (const o of CURRENT_OBSTACLES) {
+    const cx = o.x + o.size / 2;
+    const cy = o.y + o.size / 2;
+    const r = o.size / 2 * 0.72 + lookahead;
+    const dx = x - cx, dy = y - cy;
+    const d2 = dx * dx + dy * dy;
+    if (d2 < r * r && d2 > 0.0001) {
+      const d = Math.sqrt(d2);
+      const w = (r - d) / r;
+      ax += (dx / d) * w;
+      ay += (dy / d) * w;
+    }
+  }
+  return { ax, ay };
+}
+
+// Returns true if a point lies inside any asteroid's solid hitbox.
+function pointInObstacle(x: number, y: number, pad = 0): boolean {
+  for (const o of CURRENT_OBSTACLES) {
+    const cx = o.x + o.size / 2;
+    const cy = o.y + o.size / 2;
+    const r = o.size / 2 * 0.72 + pad;
+    const dx = x - cx, dy = y - cy;
+    if (dx * dx + dy * dy <= r * r) return true;
+  }
+  return false;
+}
+
 const LOOT_MIN_SPACING = 4;
 function randPlayablePosAway(from?: Vec, minDist = SPAWN_MIN_DIST, pad = 3, astPad = 1.8, avoidLoot?: Vec[]): Vec {
   for (let i = 0; i < 220; i++) {
@@ -1058,8 +1089,13 @@ function Game() {
           const dy = ty - (h.y + 0.5);
           const dist = Math.hypot(dx, dy);
           if (dist > 0.01) {
-            const nx = dx / dist;
-            const ny = dy / dist;
+            let nx = dx / dist;
+            let ny = dy / dist;
+            const av = obstacleAvoidance(h.x + 0.5, h.y + 0.5, 1.6);
+            nx += av.ax * 3;
+            ny += av.ay * 3;
+            const nlen = Math.hypot(nx, ny) || 1;
+            nx /= nlen; ny /= nlen;
             const fleeSpeedMul = h.fleeing ? 1.15 : 1;
             const move = Math.min(step * fleeSpeedMul, dist);
             h.x += nx * move;
@@ -1273,6 +1309,10 @@ function Game() {
           p.x += p.vx * stepDt;
           p.y += p.vy * stepDt;
           if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
+          if (pointInObstacle(p.x, p.y, 0)) {
+            s.explosions.push({ x: p.x, y: p.y, t0: performance.now() });
+            return false;
+          }
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
             const hr = HIT_R + Math.min(0.6, h.hp * 0.08);
@@ -1365,14 +1405,28 @@ function Game() {
           const step = WARDEN_SPEED * dtSec;
           if (engaged) {
             // Chase to standoff distance only while in view.
+            const av = obstacleAvoidance(w.x + 0.5, w.y + 0.5, 1.8);
             if (dist > WARDEN_PREFERRED_DIST + 0.5) {
+              let nx = dx / dist + av.ax * 3;
+              let ny = dy / dist + av.ay * 3;
+              const nl = Math.hypot(nx, ny) || 1;
+              nx /= nl; ny /= nl;
               const move = Math.min(step, dist - WARDEN_PREFERRED_DIST);
-              w.x += (dx / dist) * move;
-              w.y += (dy / dist) * move;
+              w.x += nx * move;
+              w.y += ny * move;
             } else if (dist < WARDEN_PREFERRED_DIST - 1.5) {
+              let nx = -dx / dist + av.ax * 3;
+              let ny = -dy / dist + av.ay * 3;
+              const nl = Math.hypot(nx, ny) || 1;
+              nx /= nl; ny /= nl;
               const move = Math.min(step * 0.7, WARDEN_PREFERRED_DIST - dist);
-              w.x -= (dx / dist) * move;
-              w.y -= (dy / dist) * move;
+              w.x += nx * move;
+              w.y += ny * move;
+            } else if (av.ax !== 0 || av.ay !== 0) {
+              // Standing inside an asteroid's danger ring — slide out of it.
+              const nl = Math.hypot(av.ax, av.ay) || 1;
+              w.x += (av.ax / nl) * step;
+              w.y += (av.ay / nl) * step;
             }
           }
           w.x = Math.max(1, Math.min(WORLD_W - 2, w.x));
@@ -1412,6 +1466,10 @@ function Game() {
             p.x += p.vx * stepDt;
             p.y += p.vy * stepDt;
             if (p.x < 0 || p.y < 0 || p.x >= WORLD_W || p.y >= WORLD_H) return false;
+            if (pointInObstacle(p.x, p.y, 0)) {
+              s.explosions.push({ x: p.x, y: p.y, t0: performance.now() });
+              return false;
+            }
             for (let i = 0; i < s.snake.length; i++) {
               const seg = s.snake[i];
               const dx = p.x - seg.x;
