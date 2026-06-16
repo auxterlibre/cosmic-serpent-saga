@@ -472,6 +472,7 @@ function initialState() {
     paused: true,
     shopOpen: false,
     cpCooldown: new Set<number>(),
+    fieldActive: false,
     manualPause: true,
     keys: new Set<string>(),
   };
@@ -1179,6 +1180,42 @@ function Game() {
           a.y = Math.max(0, Math.min(WORLD_H - 1, a.y));
         }
 
+        // ---- Checkpoint force field: scatters hunter cargo and forces them to roam.
+        const FIELD_R = 7;
+        const FIELD_R2 = FIELD_R * FIELD_R;
+        const pHead = s.snake[0];
+        let inField = false;
+        if (pHead) {
+          for (const cp of s.checkpoints) {
+            const dxh = cp.x + 0.5 - pHead.x;
+            const dyh = cp.y + 0.5 - pHead.y;
+            if (dxh * dxh + dyh * dyh <= FIELD_R2) {
+              inField = true;
+              break;
+            }
+          }
+        }
+        if (inField && !s.fieldActive) {
+          for (const h of s.hunters) {
+            for (const seg of h.stolen) {
+              const jx = (Math.random() - 0.5) * 1.4;
+              const jy = (Math.random() - 0.5) * 1.4;
+              s.loot.push({
+                x: Math.max(0, Math.min(WORLD_W - 1, h.x + jx)),
+                y: Math.max(0, Math.min(WORLD_H - 1, h.y + jy)),
+                color: seg.color,
+                rarity: seg.rarity,
+              });
+            }
+            h.stolen.length = 0;
+            h.trail.length = 0;
+            h.fleeing = false;
+            h.fleeTarget = null;
+            h.wanderTarget = null;
+          }
+        }
+        s.fieldActive = inField;
+
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
           if (!h.elite && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
@@ -1194,7 +1231,14 @@ function Game() {
           }
 
           let tx: number, ty: number;
-          if (h.fleeing) {
+          if (s.fieldActive) {
+            // Player is inside a checkpoint force field — enemies cannot lock on; they roam.
+            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+            }
+            tx = h.wanderTarget.x;
+            ty = h.wanderTarget.y;
+          } else if (h.fleeing) {
             if (!h.fleeTarget) {
               const ex = h.x < WORLD_W / 2 ? -2 : WORLD_W + 2;
               const ey = h.y < WORLD_H / 2 ? -2 : WORLD_H + 2;
@@ -1794,6 +1838,42 @@ function Game() {
         if (px < -CELL * 4 || py < -CELL * 4 || px > wViewW + CELL * 3 || py > wViewH + CELL * 3) continue;
         const cx = px + CELL / 2;
         const cy = py + CELL / 2;
+
+        // ---- Force field shield around the station ----
+        {
+          const FIELD_R = 7;
+          const fieldPx = FIELD_R * CELL;
+          const active = s.fieldActive;
+          const breathe = 0.5 + 0.5 * Math.sin(tStation / 420);
+          const alphaFill = active ? 0.18 + 0.08 * breathe : 0.07 + 0.04 * breathe;
+          const alphaRing = active ? 0.85 : 0.45;
+          const grd = ctx.createRadialGradient(cx, cy, fieldPx * 0.55, cx, cy, fieldPx);
+          grd.addColorStop(0, `rgba(96, 200, 255, 0)`);
+          grd.addColorStop(0.75, `rgba(96, 200, 255, ${alphaFill * 0.5})`);
+          grd.addColorStop(1, `rgba(160, 230, 255, ${alphaFill})`);
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(cx, cy, fieldPx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.save();
+          ctx.strokeStyle = `rgba(140, 220, 255, ${alphaRing})`;
+          ctx.lineWidth = active ? 2.4 : 1.4;
+          ctx.setLineDash([6, 8]);
+          ctx.lineDashOffset = -tStation / 60;
+          ctx.beginPath();
+          ctx.arc(cx, cy, fieldPx, 0, Math.PI * 2);
+          ctx.stroke();
+          if (active) {
+            ctx.strokeStyle = `rgba(200, 240, 255, 0.5)`;
+            ctx.lineWidth = 1;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            ctx.arc(cx, cy, fieldPx * (0.92 + 0.06 * breathe), 0, Math.PI * 2);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+
         // deterministic per-station seed so each looks unique but stable
         const seed = (cp.x * 73856093) ^ (cp.y * 19349663);
         const rot = ((seed & 0xff) / 255) * Math.PI * 2 + tStation / 6000;
