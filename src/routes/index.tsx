@@ -1401,14 +1401,28 @@ function Game() {
           const step = WARDEN_SPEED * dtSec;
           if (engaged) {
             // Chase to standoff distance only while in view.
+            const av = obstacleAvoidance(w.x + 0.5, w.y + 0.5, 1.8);
             if (dist > WARDEN_PREFERRED_DIST + 0.5) {
+              let nx = dx / dist + av.ax * 3;
+              let ny = dy / dist + av.ay * 3;
+              const nl = Math.hypot(nx, ny) || 1;
+              nx /= nl; ny /= nl;
               const move = Math.min(step, dist - WARDEN_PREFERRED_DIST);
-              w.x += (dx / dist) * move;
-              w.y += (dy / dist) * move;
+              w.x += nx * move;
+              w.y += ny * move;
             } else if (dist < WARDEN_PREFERRED_DIST - 1.5) {
+              let nx = -dx / dist + av.ax * 3;
+              let ny = -dy / dist + av.ay * 3;
+              const nl = Math.hypot(nx, ny) || 1;
+              nx /= nl; ny /= nl;
               const move = Math.min(step * 0.7, WARDEN_PREFERRED_DIST - dist);
-              w.x -= (dx / dist) * move;
-              w.y -= (dy / dist) * move;
+              w.x += nx * move;
+              w.y += ny * move;
+            } else if (av.ax !== 0 || av.ay !== 0) {
+              // Standing inside an asteroid's danger ring — slide out of it.
+              const nl = Math.hypot(av.ax, av.ay) || 1;
+              w.x += (av.ax / nl) * step;
+              w.y += (av.ay / nl) * step;
             }
           }
           w.x = Math.max(1, Math.min(WORLD_W - 2, w.x));
