@@ -62,8 +62,9 @@ type Hunter = {
   fleeing: boolean;
   fleeTarget: Vec | null;
   wanderTarget: Vec | null;
+  hitT0?: number;
 };
-type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number };
+type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number; hitT0?: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
 type WardenShot = { x: number; y: number; vx: number; vy: number; life: number };
 type Checkpoint = { x: number; y: number };
@@ -1546,6 +1547,7 @@ function Game() {
             const dy = p.y - (h.y + 0.5);
             if (dx * dx + dy * dy <= hr * hr) {
               h.hp -= s.damage;
+              h.hitT0 = performance.now();
               if (h.hp <= 0) {
                 s.score += 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
@@ -1576,6 +1578,7 @@ function Game() {
             const dy = p.y - (w.y + 0.5);
             if (dx * dx + dy * dy <= wr * wr) {
               w.hp -= s.damage;
+              w.hitT0 = performance.now();
               if (w.hp <= 0) {
                 s.score += 60;
                 const nowK = performance.now();
@@ -2380,6 +2383,23 @@ function Game() {
         ctx.beginPath();
         ctx.arc(1, 0, h.elite ? 2.2 : 1.8, 0, Math.PI * 2);
         ctx.fill();
+        // hit flash
+        if (h.hitT0) {
+          const age = performance.now() - h.hitT0;
+          if (age < 160) {
+            const a = (1 - age / 160) * 0.9;
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.beginPath();
+            ctx.moveTo(S + 2, 0);
+            ctx.lineTo(0, S - 1);
+            ctx.lineTo(-S + 2, S - 2);
+            ctx.lineTo(-S + 4, 0);
+            ctx.lineTo(-S + 2, -(S - 2));
+            ctx.lineTo(0, -(S - 1));
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
@@ -2438,6 +2458,23 @@ function Game() {
         ctx.beginPath();
         ctx.arc(R * 1.05, 0, R * 0.5, 0, Math.PI * 2);
         ctx.fill();
+        // hit flash
+        if (w.hitT0) {
+          const age = performance.now() - w.hitT0;
+          if (age < 180) {
+            const a = (1 - age / 180) * 0.85;
+            ctx.fillStyle = `rgba(255,255,255,${a})`;
+            ctx.beginPath();
+            ctx.moveTo(R, 0);
+            ctx.lineTo(R * 0.55, R * 0.85);
+            ctx.lineTo(-R * 0.7, R * 0.95);
+            ctx.lineTo(-R, 0);
+            ctx.lineTo(-R * 0.7, -R * 0.95);
+            ctx.lineTo(R * 0.55, -R * 0.85);
+            ctx.closePath();
+            ctx.fill();
+          }
+        }
         ctx.restore();
       }
 
