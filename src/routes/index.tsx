@@ -987,7 +987,17 @@ function Game() {
 
         for (const h of s.hunters) {
           if (h.cooldown > 0) h.cooldown = Math.max(0, h.cooldown - dt);
-          if (!h.elite && h.stolen.length >= 5) { h.elite = true; h.hp += 3; h.stolen.length = 0; h.trail.length = 0; }
+          if (!h.elite && h.stolen.length >= 5) {
+            h.elite = true;
+            h.hp += 3;
+            h.stolen.length = 0;
+            h.trail.length = 0;
+            // Becoming elite cancels any flee state — it now hunts the player aggressively.
+            h.fleeing = false;
+            h.fleeTarget = null;
+            h.wanderTarget = null;
+            h.cooldown = 600;
+          }
 
 
           let tx: number, ty: number;
@@ -999,6 +1009,15 @@ function Game() {
             }
             tx = h.fleeTarget.x + 0.5;
             ty = h.fleeTarget.y + 0.5;
+          } else if (h.elite && s.snake[0]) {
+            // Elite hunters orbit the player at a standoff distance and fire at them.
+            const playerHead = s.snake[0];
+            const ELITE_DIST = 9;
+            const pdx = (h.x + 0.5) - playerHead.x;
+            const pdy = (h.y + 0.5) - playerHead.y;
+            const pAng = Math.atan2(pdy, pdx) + 0.55; // tangential lead → circling
+            tx = playerHead.x + Math.cos(pAng) * ELITE_DIST;
+            ty = playerHead.y + Math.sin(pAng) * ELITE_DIST;
           } else if (loot <= 0) {
             // No player cargo to steal — go after nearest loot in the world.
             let bestD = Infinity;
@@ -1105,6 +1124,36 @@ function Game() {
               const idx = s.hunters.indexOf(h);
               if (idx >= 0) {
                 s.hunters.splice(idx, 1);
+              }
+            }
+            continue;
+          }
+
+          if (h.elite) {
+            const phead = s.snake[0];
+            if (phead && h.cooldown <= 0) {
+              const ELITE_FIRE_RANGE = 14;
+              const ddx = phead.x - (h.x + 0.5);
+              const ddy = phead.y - (h.y + 0.5);
+              const ddist = Math.hypot(ddx, ddy);
+              if (ddist < ELITE_FIRE_RANGE && ddist > 0.01) {
+                const ELITE_SHOT_SPEED = 13;
+                const vxH = Math.cos(s.headAngle) * s.playerSpeed;
+                const vyH = Math.sin(s.headAngle) * s.playerSpeed;
+                const tflight = ddist / ELITE_SHOT_SPEED;
+                const aimX = phead.x + vxH * tflight * 0.5;
+                const aimY = phead.y + vyH * tflight * 0.5;
+                const adx = aimX - (h.x + 0.5);
+                const ady = aimY - (h.y + 0.5);
+                const alen = Math.hypot(adx, ady) || 1;
+                s.wardenShots.push({
+                  x: h.x + 0.5,
+                  y: h.y + 0.5,
+                  vx: (adx / alen) * ELITE_SHOT_SPEED,
+                  vy: (ady / alen) * ELITE_SHOT_SPEED,
+                  life: 3500,
+                });
+                h.cooldown = 1400;
               }
             }
             continue;
