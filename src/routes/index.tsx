@@ -1206,7 +1206,11 @@ function Game() {
           s.cpCooldown.add(i);
           // Reaching a checkpoint locks in any over-cap segments as currency.
           for (const sg of s.snake) if (sg.overCapUntil !== undefined) sg.overCapUntil = undefined;
+          shopRef.current = { open: true, checkpoint: i };
+          pausedRef.current = true;
           setShop({ open: true, checkpoint: i });
+          setPaused(true);
+          persistGameSession(true);
           break;
         }
       }
@@ -2005,6 +2009,7 @@ function Game() {
       updatePlayer(dt);
       updateRealtime(dt);
       draw();
+      persistGameSession();
       raf = requestAnimationFrame(loop);
     };
 
