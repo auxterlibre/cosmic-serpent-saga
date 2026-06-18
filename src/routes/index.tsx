@@ -1840,7 +1840,34 @@ function Game() {
                   // Cleave the train: the struck cargo is destroyed, the rest
                   // is released back into space as collectible loot.
                   const removed = s.snake.splice(i);
-                  s.explosions.push({ x: removed[0].x, y: removed[0].y, t0: now });
+                  // Beefy destruction FX at the hit segment so it's obvious the cargo blew up.
+                  const hitX = removed[0].x;
+                  const hitY = removed[0].y;
+                  s.explosions.push({ x: hitX, y: hitY, t0: now });
+                  s.explosions.push({ x: hitX + 0.35, y: hitY - 0.25, t0: now + 70 });
+                  s.explosions.push({ x: hitX - 0.3, y: hitY + 0.3, t0: now + 140 });
+                  // Cargo-colored shrapnel
+                  const cargoFill = removed[0].color || "#888";
+                  const darker = cargoFill.startsWith("#")
+                    ? `rgb(${Math.max(0, parseInt(cargoFill.slice(1, 3), 16) - 40)},${Math.max(0, parseInt(cargoFill.slice(3, 5), 16) - 40)},${Math.max(0, parseInt(cargoFill.slice(5, 7), 16) - 40)})`
+                    : cargoFill;
+                  for (let k = 0; k < 8; k++) {
+                    const a = (k / 8) * Math.PI * 2 + Math.random() * 0.5;
+                    const sp = 1.8 + Math.random() * 3;
+                    s.debris.push({
+                      x: hitX,
+                      y: hitY,
+                      vx: Math.cos(a) * sp,
+                      vy: Math.sin(a) * sp,
+                      rot: Math.random() * Math.PI * 2,
+                      vr: (Math.random() - 0.5) * 8,
+                      size: 0.35 + Math.random() * 0.35,
+                      t0: now,
+                      seed: (Math.floor(now) + k * 2654435761) >>> 0,
+                      baseFill: cargoFill,
+                      craterC: darker,
+                    });
+                  }
                   for (let k = 1; k < removed.length; k++) {
                     const sg = removed[k];
                     let rar: Rarity = "common";
