@@ -68,6 +68,7 @@ type Hunter = {
   hitT0?: number;
   boostUntil?: number;
   eliteT0?: number; // start time of elite transformation animation
+  wardenT0?: number; // start time of elite → Warden transformation animation
 };
 type Warden = { x: number; y: number; angle: number; hp: number; cooldown: number; hitT0?: number };
 type Projectile = { x: number; y: number; vx: number; vy: number; life: number };
