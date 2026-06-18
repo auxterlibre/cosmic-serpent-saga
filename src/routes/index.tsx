@@ -45,7 +45,7 @@ const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 5;
 const WARDEN_FIRE_INTERVAL = 2200;
 const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
-const WARDEN_PREFERRED_DIST = 8;
+const WARDEN_PREFERRED_DIST = 20;
 const WARDEN_FIRE_RANGE = 15;
 
 type Rarity = "common" | "uncommon" | "rare" | "epic";
