@@ -485,10 +485,78 @@ function initialState() {
   };
 }
 
+type GameState = ReturnType<typeof initialState>;
+type GameSession = {
+  state: GameState;
+  started: boolean;
+  paused: boolean;
+  shop: { open: boolean; checkpoint: number | null };
+};
+type SavedGameSession = Omit<GameState, "keys" | "cpCooldown"> & {
+  cpCooldown: number[];
+  savedAt: number;
+  uiStarted: boolean;
+  uiPaused: boolean;
+  uiShop: { open: boolean; checkpoint: number | null };
+};
+
+const GAME_SESSION_KEY = "space-train-active-session-v1";
+
+function shiftOptionalTime<T extends Record<string, unknown>>(obj: T, key: keyof T, delta: number) {
+  const value = obj[key];
+  if (typeof value === "number") obj[key] = (value + delta) as T[keyof T];
+}
+
+function loadGameSession(): GameSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(GAME_SESSION_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as SavedGameSession;
+    if (!saved || !Array.isArray(saved.snake) || !Array.isArray(saved.obstacles)) return null;
+    if (!saved.uiStarted && !saved.shopOpen) return null;
+    const { savedAt, uiStarted, uiPaused, uiShop, cpCooldown, ...serializableState } = saved;
+    const delta = performance.now() - (typeof savedAt === "number" ? savedAt : performance.now());
+    const state = {
+      ...serializableState,
+      cpCooldown: new Set(cpCooldown ?? []),
+      keys: new Set<string>(),
+    } as GameState;
+    CURRENT_OBSTACLES = state.obstacles;
+    for (const seg of state.snake) shiftOptionalTime(seg, "overCapUntil", delta);
+    for (const hunter of state.hunters) {
+      shiftOptionalTime(hunter, "hitT0", delta);
+      shiftOptionalTime(hunter, "boostUntil", delta);
+      shiftOptionalTime(hunter, "eliteT0", delta);
+      shiftOptionalTime(hunter, "wardenT0", delta);
+    }
+    for (const warden of state.wardens) shiftOptionalTime(warden, "hitT0", delta);
+    for (const explosion of state.explosions) explosion.t0 += delta;
+    for (const debris of state.debris) debris.t0 += delta;
+    for (const pickup of state.pickups) pickup.t0 += delta;
+    for (const scrap of state.scraps) scrap.spawnedAt += delta;
+    return {
+      state,
+      started: Boolean(uiStarted),
+      paused: Boolean(uiPaused),
+      shop: uiShop ?? { open: state.shopOpen, checkpoint: null },
+    };
+  } catch {
+    return null;
+  }
+}
+
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [initialGameState] = useState(() => initialState());
+  const restoredSessionRef = useRef<GameSession | null>(loadGameSession());
+  const [initialGameState] = useState(() => restoredSessionRef.current?.state ?? initialState());
   const stateRef = useRef(initialGameState);
+  const startedRef = useRef(restoredSessionRef.current?.started ?? false);
+  const pausedRef = useRef(restoredSessionRef.current?.paused ?? false);
+  const shopRef = useRef<{ open: boolean; checkpoint: number | null }>(
+    restoredSessionRef.current?.shop ?? { open: false, checkpoint: null },
+  );
+  const lastPersistRef = useRef(0);
   const [, force] = useState(0);
   const [hud, setHud] = useState({
     score: 0,
@@ -509,9 +577,9 @@ function Game() {
     lvlCap: 1,
     segCap: INITIAL_CAP,
   });
-  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
-  const [started, setStarted] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>(shopRef.current);
+  const [started, setStarted] = useState(startedRef.current);
+  const [paused, setPaused] = useState(pausedRef.current);
   const [flash, setFlash] = useState<Record<string, number>>({});
   const flashRes = (keys: string[]) => {
     const now = Date.now();
