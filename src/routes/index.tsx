@@ -1227,9 +1227,12 @@ function Game() {
         const dtSec = dt / 1000;
         const step = HUNTER_SPEED * dtSec;
 
-        // Scale hunter count with loot carried (excluding the head/ship segment).
-        const loot = Math.max(0, s.snake.length - 1);
-        const desired = Math.min(HUNTER_MAX, 6 + Math.ceil(loot * HUNTER_PER_LOOT));
+        // Scale hunter count with total upgrades purchased (each level starts at 1).
+        const upgrades = Math.max(
+          0,
+          s.lvlFireRate + s.lvlDamage + s.lvlRange + s.lvlMultishot + s.lvlSpeed + s.lvlCap - 6,
+        );
+        const desired = Math.min(HUNTER_MAX, 6 + Math.ceil(upgrades * HUNTER_PER_LOOT));
         const activeCount = s.hunters.filter((h) => !h.fleeing).length;
         if (activeCount < desired) {
           for (let i = 0; i < desired - activeCount; i++) {
