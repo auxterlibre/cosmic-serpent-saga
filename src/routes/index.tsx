@@ -1474,31 +1474,13 @@ function Game() {
             tx = playerHead.x + Math.cos(pAng) * ELITE_ORBIT_DIST;
             ty = playerHead.y + Math.sin(pAng) * ELITE_ORBIT_DIST;
           } else if (loot <= 0) {
-            // No player cargo to steal — go after nearest loot in the world.
-            let bestD = Infinity;
-            let bx = 0,
-              by = 0;
-            for (const l of s.loot) {
-              const ddx = l.x + 0.5 - (h.x + 0.5);
-              const ddy = l.y + 0.5 - (h.y + 0.5);
-              const d = ddx * ddx + ddy * ddy;
-              if (d < bestD) {
-                bestD = d;
-                bx = l.x + 0.5;
-                by = l.y + 0.5;
-              }
+            // No player cargo to steal — wander the world. Loot is picked up
+            // only on incidental collision (see opportunistic pickup below).
+            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
             }
-            if (bestD === Infinity) {
-              if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
-                h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
-              }
-              tx = h.wanderTarget.x;
-              ty = h.wanderTarget.y;
-            } else {
-              h.wanderTarget = null;
-              tx = bx;
-              ty = by;
-            }
+            tx = h.wanderTarget.x;
+            ty = h.wanderTarget.y;
           } else {
             h.wanderTarget = null;
             let bestD = Infinity;
