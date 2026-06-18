@@ -693,33 +693,68 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
+    startedRef.current = false;
+    pausedRef.current = false;
+    shopRef.current = { open: false, checkpoint: null };
+    window.sessionStorage.removeItem(GAME_SESSION_KEY);
     syncHud();
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
   }
 
+  function persistGameSession(force = false) {
+    if (typeof window === "undefined") return;
+    const now = performance.now();
+    if (!force && now - lastPersistRef.current < 750) return;
+    lastPersistRef.current = now;
+    const s = stateRef.current;
+    if (!s.alive || (!startedRef.current && !shopRef.current.open)) {
+      window.sessionStorage.removeItem(GAME_SESSION_KEY);
+      return;
+    }
+    const { keys: _keys, cpCooldown: _cpCooldown, ...serializableState } = s;
+    const saved: SavedGameSession = {
+      ...serializableState,
+      cpCooldown: Array.from(s.cpCooldown),
+      savedAt: now,
+      uiStarted: startedRef.current,
+      uiPaused: pausedRef.current,
+      uiShop: shopRef.current,
+    };
+    window.sessionStorage.setItem(GAME_SESSION_KEY, JSON.stringify(saved));
+  }
+
   function startGame() {
     const s = stateRef.current;
     s.paused = false;
     s.manualPause = false;
+    startedRef.current = true;
+    pausedRef.current = false;
     setStarted(true);
     setPaused(false);
+    persistGameSession(true);
   }
 
   function togglePause() {
     const s = stateRef.current;
-    if (s.shopOpen || !started) return;
+    if (s.shopOpen || !startedRef.current) return;
     s.manualPause = !s.manualPause;
     s.paused = s.manualPause;
+    pausedRef.current = s.manualPause;
     setPaused(s.manualPause);
+    persistGameSession(true);
   }
 
   function closeShop() {
     const s = stateRef.current;
     s.paused = false;
     s.shopOpen = false;
+    shopRef.current = { open: false, checkpoint: null };
+    pausedRef.current = false;
     setShop({ open: false, checkpoint: null });
+    setPaused(false);
+    persistGameSession(true);
   }
 
   function spendSegments(cost: Cost) {
