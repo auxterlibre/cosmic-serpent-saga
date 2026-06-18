@@ -3092,6 +3092,35 @@ function Game() {
 
         ctx.restore();
 
+        // ---- shot cooldown donut around the ship ----
+        {
+          const progress = Math.max(0, Math.min(1, s.fireTimer / Math.max(1, s.fireIntervalMs)));
+          const ready = progress >= 1;
+          const donutR = R * 1.95;
+          // background track
+          ctx.beginPath();
+          ctx.arc(hx, hy, donutR, 0, Math.PI * 2);
+          ctx.strokeStyle = "rgba(20, 24, 30, 0.55)";
+          ctx.lineWidth = 3.2;
+          ctx.stroke();
+          // progress arc
+          ctx.beginPath();
+          ctx.arc(hx, hy, donutR, -Math.PI / 2, -Math.PI / 2 + progress * Math.PI * 2);
+          ctx.strokeStyle = ready ? "rgba(125, 249, 255, 0.95)" : "rgba(255, 170, 60, 0.9)";
+          ctx.lineWidth = 2.6;
+          ctx.lineCap = "round";
+          ctx.stroke();
+          ctx.lineCap = "butt";
+          if (ready) {
+            const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 120);
+            ctx.beginPath();
+            ctx.arc(hx, hy, donutR + 1.5, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(125, 249, 255, ${0.15 + 0.25 * pulse})`;
+            ctx.lineWidth = 1.4;
+            ctx.stroke();
+          }
+        }
+
         ctx.strokeStyle = "rgba(125, 249, 255, 0.18)";
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
