@@ -502,9 +502,10 @@ type SavedGameSession = Omit<GameState, "keys" | "cpCooldown"> & {
 
 const GAME_SESSION_KEY = "space-train-active-session-v1";
 
-function shiftOptionalTime<T extends Record<string, unknown>>(obj: T, key: keyof T, delta: number) {
-  const value = obj[key];
-  if (typeof value === "number") obj[key] = (value + delta) as T[keyof T];
+function shiftOptionalTime(obj: unknown, key: string, delta: number) {
+  const record = obj as Record<string, unknown>;
+  const value = record[key];
+  if (typeof value === "number") record[key] = value + delta;
 }
 
 function loadGameSession(): GameSession | null {
