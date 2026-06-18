@@ -1271,12 +1271,69 @@ function Game() {
             }
           }
 
+          // Warden transformation: elite hunter freezes, segments orbit then smash, hunter becomes a Warden.
+          if (h.wardenT0 !== undefined) {
+            const age = performance.now() - h.wardenT0;
+            if (age >= WARDEN_TRANSFORM_DURATION) {
+              // Spawn a Warden where the hunter stood and remove the hunter.
+              s.wardens.push({
+                x: h.x,
+                y: h.y,
+                angle: h.angle,
+                hp: WARDEN_HP,
+                cooldown: 1200,
+              });
+              s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
+              const idx = s.hunters.indexOf(h);
+              if (idx >= 0) s.hunters.splice(idx, 1);
+              continue;
+            } else {
+              while (h.trail.length < h.stolen.length) {
+                const idx = h.trail.length;
+                h.trail.push({
+                  x: h.x,
+                  y: h.y,
+                  color: h.stolen[idx]?.color ?? SEG_COLOR_DEFAULT,
+                  rarity: h.stolen[idx]?.rarity ?? "common",
+                });
+              }
+              const t = age / WARDEN_TRANSFORM_DURATION;
+              const phase1 = 0.6;
+              const radius = 3.2;
+              const n = Math.max(1, h.trail.length);
+              for (let i = 0; i < h.trail.length; i++) {
+                const ang = (i / n) * Math.PI * 2 - age * 0.005;
+                let r: number;
+                if (t < phase1) {
+                  const k = t / phase1;
+                  r = radius * (1 - Math.pow(1 - k, 3));
+                } else {
+                  const k = (t - phase1) / (1 - phase1);
+                  r = radius * (1 - Math.pow(k, 2.2));
+                }
+                h.trail[i].x = h.x + Math.cos(ang) * r;
+                h.trail[i].y = h.y + Math.sin(ang) * r;
+              }
+              continue;
+            }
+          }
+
           if (!h.elite && h.stolen.length >= ELITE_UPGRADE_SEGMENTS) {
             h.eliteT0 = performance.now();
             h.fleeing = false;
             h.fleeTarget = null;
             h.wanderTarget = null;
             h.boostUntil = undefined;
+            continue;
+          }
+
+          if (h.elite && h.stolen.length >= WARDEN_UPGRADE_SEGMENTS) {
+            h.wardenT0 = performance.now();
+            h.fleeing = false;
+            h.fleeTarget = null;
+            h.wanderTarget = null;
+            h.boostUntil = undefined;
+            h.cooldown = WARDEN_TRANSFORM_DURATION;
             continue;
           }
 
