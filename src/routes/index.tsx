@@ -45,8 +45,8 @@ const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 5;
 const WARDEN_FIRE_INTERVAL = 2200;
 const WARDEN_SHOT_SPEED = 11; // slower than player's 45 so shots can be dodged
-const WARDEN_PREFERRED_DIST = 12;
-const WARDEN_FIRE_RANGE = 20;
+const WARDEN_PREFERRED_DIST = 8;
+const WARDEN_FIRE_RANGE = 15;
 
 type Rarity = "common" | "uncommon" | "rare" | "epic";
 type Vec = { x: number; y: number };
@@ -549,12 +549,14 @@ function loadGameSession(): GameSession | null {
 
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const restoredSessionRef = useRef<GameSession | null>(null);
-  const [initialGameState] = useState(() => initialState());
+  const restoredSessionRef = useRef<GameSession | null>(loadGameSession());
+  const [initialGameState] = useState(() => restoredSessionRef.current?.state ?? initialState());
   const stateRef = useRef(initialGameState);
-  const startedRef = useRef(false);
-  const pausedRef = useRef(false);
-  const shopRef = useRef<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
+  const startedRef = useRef(restoredSessionRef.current?.started ?? false);
+  const pausedRef = useRef(restoredSessionRef.current?.paused ?? false);
+  const shopRef = useRef<{ open: boolean; checkpoint: number | null }>(
+    restoredSessionRef.current?.shop ?? { open: false, checkpoint: null },
+  );
   const lastPersistRef = useRef(0);
   const [, force] = useState(0);
   const [hud, setHud] = useState(() => ({
@@ -576,43 +578,9 @@ function Game() {
     lvlCap: initialGameState.lvlCap,
     segCap: initialGameState.segCap,
   }));
-  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
-  const [started, setStarted] = useState(false);
-  const [paused, setPaused] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
-  useEffect(() => {
-    const saved = loadGameSession();
-    if (saved) {
-      restoredSessionRef.current = saved;
-      stateRef.current = saved.state;
-      startedRef.current = saved.started;
-      pausedRef.current = saved.paused;
-      shopRef.current = saved.shop;
-      setShop(saved.shop);
-      setStarted(saved.started);
-      setPaused(saved.paused);
-      setHud({
-        score: saved.state.score,
-        length: saved.state.snake.length,
-        alive: saved.state.alive,
-        fireIntervalMs: saved.state.fireIntervalMs,
-        damage: saved.state.damage,
-        fireRange: saved.state.fireRange,
-        multishot: saved.state.multishot,
-        playerSpeed: saved.state.playerSpeed,
-        inventory: computeInventory(saved.state.snake, saved.state.growth, saved.state.scrap),
-        scrap: saved.state.scrap,
-        lvlFireRate: saved.state.lvlFireRate,
-        lvlDamage: saved.state.lvlDamage,
-        lvlRange: saved.state.lvlRange,
-        lvlMultishot: saved.state.lvlMultishot,
-        lvlSpeed: saved.state.lvlSpeed,
-        lvlCap: saved.state.lvlCap,
-        segCap: saved.state.segCap,
-      });
-    }
-    setHydrated(true);
-  }, []);
+  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>(shopRef.current);
+  const [started, setStarted] = useState(startedRef.current);
+  const [paused, setPaused] = useState(pausedRef.current);
   const [flash, setFlash] = useState<Record<string, number>>({});
   const flashRes = (keys: string[]) => {
     const now = Date.now();
@@ -1506,13 +1474,31 @@ function Game() {
             tx = playerHead.x + Math.cos(pAng) * ELITE_ORBIT_DIST;
             ty = playerHead.y + Math.sin(pAng) * ELITE_ORBIT_DIST;
           } else if (loot <= 0) {
-            // No player cargo to steal — wander the world. Loot is picked up
-            // only on incidental collision (see opportunistic pickup below).
-            if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
-              h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+            // No player cargo to steal — go after nearest loot in the world.
+            let bestD = Infinity;
+            let bx = 0,
+              by = 0;
+            for (const l of s.loot) {
+              const ddx = l.x + 0.5 - (h.x + 0.5);
+              const ddy = l.y + 0.5 - (h.y + 0.5);
+              const d = ddx * ddx + ddy * ddy;
+              if (d < bestD) {
+                bestD = d;
+                bx = l.x + 0.5;
+                by = l.y + 0.5;
+              }
             }
-            tx = h.wanderTarget.x;
-            ty = h.wanderTarget.y;
+            if (bestD === Infinity) {
+              if (!h.wanderTarget || Math.hypot(h.wanderTarget.x - (h.x + 0.5), h.wanderTarget.y - (h.y + 0.5)) < 1.5) {
+                h.wanderTarget = { x: 4 + Math.random() * (WORLD_W - 8), y: 4 + Math.random() * (WORLD_H - 8) };
+              }
+              tx = h.wanderTarget.x;
+              ty = h.wanderTarget.y;
+            } else {
+              h.wanderTarget = null;
+              tx = bx;
+              ty = by;
+            }
           } else {
             h.wanderTarget = null;
             let bestD = Infinity;
@@ -2679,7 +2665,9 @@ function Game() {
           const auraR = CELL * (isWarden ? 3.6 : 3);
           const aura = ctx.createRadialGradient(0, 0, 2, 0, 0, auraR);
           const innerC = isWarden ? `rgba(252, 165, 165, ${0.4 + 0.5 * t})` : `rgba(254, 240, 138, ${0.35 + 0.5 * t})`;
-          const midC = isWarden ? `rgba(127, 29, 29, ${0.22 + 0.5 * t * pulse})` : `rgba(220, 38, 38, ${0.18 + 0.4 * t * pulse})`;
+          const midC = isWarden
+            ? `rgba(127, 29, 29, ${0.22 + 0.5 * t * pulse})`
+            : `rgba(220, 38, 38, ${0.18 + 0.4 * t * pulse})`;
           const outC = isWarden ? "rgba(127, 29, 29, 0)" : "rgba(220, 38, 38, 0)";
           aura.addColorStop(0, innerC);
           aura.addColorStop(0.5, midC);
