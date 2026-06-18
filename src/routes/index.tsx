@@ -1822,8 +1822,11 @@ function Game() {
 
       // ---- Wardens: slow heavy turret ships that shoot the player ----
       {
-        const loot = Math.max(0, s.snake.length - 1);
-        const desired = loot >= 12 ? 7 : loot >= 4 ? 5 : 4;
+        const upgrades = Math.max(
+          0,
+          s.lvlFireRate + s.lvlDamage + s.lvlRange + s.lvlMultishot + s.lvlSpeed + s.lvlCap - 6,
+        );
+        const desired = upgrades >= 8 ? 7 : upgrades >= 3 ? 5 : 4;
         if (s.wardens.length < desired) {
           const CP_MIN = 18; // do not spawn wardens too close to a checkpoint
           for (let i = 0; i < desired - s.wardens.length; i++) {
