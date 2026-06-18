@@ -485,33 +485,102 @@ function initialState() {
   };
 }
 
+type GameState = ReturnType<typeof initialState>;
+type GameSession = {
+  state: GameState;
+  started: boolean;
+  paused: boolean;
+  shop: { open: boolean; checkpoint: number | null };
+};
+type SavedGameSession = Omit<GameState, "keys" | "cpCooldown"> & {
+  cpCooldown: number[];
+  savedAt: number;
+  uiStarted: boolean;
+  uiPaused: boolean;
+  uiShop: { open: boolean; checkpoint: number | null };
+};
+
+const GAME_SESSION_KEY = "space-train-active-session-v1";
+
+function shiftOptionalTime(obj: unknown, key: string, delta: number) {
+  const record = obj as Record<string, unknown>;
+  const value = record[key];
+  if (typeof value === "number") record[key] = value + delta;
+}
+
+function loadGameSession(): GameSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(GAME_SESSION_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw) as SavedGameSession;
+    if (!saved || !Array.isArray(saved.snake) || !Array.isArray(saved.obstacles)) return null;
+    if (!saved.uiStarted && !saved.shopOpen) return null;
+    const { savedAt, uiStarted, uiPaused, uiShop, cpCooldown, ...serializableState } = saved;
+    const delta = performance.now() - (typeof savedAt === "number" ? savedAt : performance.now());
+    const state = {
+      ...serializableState,
+      cpCooldown: new Set(cpCooldown ?? []),
+      keys: new Set<string>(),
+    } as GameState;
+    CURRENT_OBSTACLES = state.obstacles;
+    for (const seg of state.snake) shiftOptionalTime(seg, "overCapUntil", delta);
+    for (const hunter of state.hunters) {
+      shiftOptionalTime(hunter, "hitT0", delta);
+      shiftOptionalTime(hunter, "boostUntil", delta);
+      shiftOptionalTime(hunter, "eliteT0", delta);
+      shiftOptionalTime(hunter, "wardenT0", delta);
+    }
+    for (const warden of state.wardens) shiftOptionalTime(warden, "hitT0", delta);
+    for (const explosion of state.explosions) explosion.t0 += delta;
+    for (const debris of state.debris) debris.t0 += delta;
+    for (const pickup of state.pickups) pickup.t0 += delta;
+    for (const scrap of state.scraps) scrap.spawnedAt += delta;
+    return {
+      state,
+      started: Boolean(uiStarted),
+      paused: Boolean(uiPaused),
+      shop: uiShop ?? { open: state.shopOpen, checkpoint: null },
+    };
+  } catch {
+    return null;
+  }
+}
+
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [initialGameState] = useState(() => initialState());
+  const restoredSessionRef = useRef<GameSession | null>(loadGameSession());
+  const [initialGameState] = useState(() => restoredSessionRef.current?.state ?? initialState());
   const stateRef = useRef(initialGameState);
+  const startedRef = useRef(restoredSessionRef.current?.started ?? false);
+  const pausedRef = useRef(restoredSessionRef.current?.paused ?? false);
+  const shopRef = useRef<{ open: boolean; checkpoint: number | null }>(
+    restoredSessionRef.current?.shop ?? { open: false, checkpoint: null },
+  );
+  const lastPersistRef = useRef(0);
   const [, force] = useState(0);
-  const [hud, setHud] = useState({
-    score: 0,
-    length: 1,
-    alive: true,
-    fireIntervalMs: 2000,
-    damage: 1,
-    fireRange: 8,
-    multishot: 1,
-    playerSpeed: BASE_PLAYER_SPEED,
-    inventory: emptyCost(),
-    scrap: 0,
-    lvlFireRate: 1,
-    lvlDamage: 1,
-    lvlRange: 1,
-    lvlMultishot: 1,
-    lvlSpeed: 1,
-    lvlCap: 1,
-    segCap: INITIAL_CAP,
-  });
-  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
-  const [started, setStarted] = useState(false);
-  const [paused, setPaused] = useState(false);
+  const [hud, setHud] = useState(() => ({
+    score: initialGameState.score,
+    length: initialGameState.snake.length,
+    alive: initialGameState.alive,
+    fireIntervalMs: initialGameState.fireIntervalMs,
+    damage: initialGameState.damage,
+    fireRange: initialGameState.fireRange,
+    multishot: initialGameState.multishot,
+    playerSpeed: initialGameState.playerSpeed,
+    inventory: computeInventory(initialGameState.snake, initialGameState.growth, initialGameState.scrap),
+    scrap: initialGameState.scrap,
+    lvlFireRate: initialGameState.lvlFireRate,
+    lvlDamage: initialGameState.lvlDamage,
+    lvlRange: initialGameState.lvlRange,
+    lvlMultishot: initialGameState.lvlMultishot,
+    lvlSpeed: initialGameState.lvlSpeed,
+    lvlCap: initialGameState.lvlCap,
+    segCap: initialGameState.segCap,
+  }));
+  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>(shopRef.current);
+  const [started, setStarted] = useState(startedRef.current);
+  const [paused, setPaused] = useState(pausedRef.current);
   const [flash, setFlash] = useState<Record<string, number>>({});
   const flashRes = (keys: string[]) => {
     const now = Date.now();
@@ -625,33 +694,68 @@ function Game() {
 
   function reset() {
     stateRef.current = initialState();
+    startedRef.current = false;
+    pausedRef.current = false;
+    shopRef.current = { open: false, checkpoint: null };
+    window.sessionStorage.removeItem(GAME_SESSION_KEY);
     syncHud();
     setShop({ open: false, checkpoint: null });
     setStarted(false);
     setPaused(false);
   }
 
+  function persistGameSession(force = false) {
+    if (typeof window === "undefined") return;
+    const now = performance.now();
+    if (!force && now - lastPersistRef.current < 750) return;
+    lastPersistRef.current = now;
+    const s = stateRef.current;
+    if (!s.alive || (!startedRef.current && !shopRef.current.open)) {
+      window.sessionStorage.removeItem(GAME_SESSION_KEY);
+      return;
+    }
+    const { keys: _keys, cpCooldown: _cpCooldown, ...serializableState } = s;
+    const saved: SavedGameSession = {
+      ...serializableState,
+      cpCooldown: Array.from(s.cpCooldown),
+      savedAt: now,
+      uiStarted: startedRef.current,
+      uiPaused: pausedRef.current,
+      uiShop: shopRef.current,
+    };
+    window.sessionStorage.setItem(GAME_SESSION_KEY, JSON.stringify(saved));
+  }
+
   function startGame() {
     const s = stateRef.current;
     s.paused = false;
     s.manualPause = false;
+    startedRef.current = true;
+    pausedRef.current = false;
     setStarted(true);
     setPaused(false);
+    persistGameSession(true);
   }
 
   function togglePause() {
     const s = stateRef.current;
-    if (s.shopOpen || !started) return;
+    if (s.shopOpen || !startedRef.current) return;
     s.manualPause = !s.manualPause;
     s.paused = s.manualPause;
+    pausedRef.current = s.manualPause;
     setPaused(s.manualPause);
+    persistGameSession(true);
   }
 
   function closeShop() {
     const s = stateRef.current;
     s.paused = false;
     s.shopOpen = false;
+    shopRef.current = { open: false, checkpoint: null };
+    pausedRef.current = false;
     setShop({ open: false, checkpoint: null });
+    setPaused(false);
+    persistGameSession(true);
   }
 
   function spendSegments(cost: Cost) {
@@ -1103,7 +1207,11 @@ function Game() {
           s.cpCooldown.add(i);
           // Reaching a checkpoint locks in any over-cap segments as currency.
           for (const sg of s.snake) if (sg.overCapUntil !== undefined) sg.overCapUntil = undefined;
+          shopRef.current = { open: true, checkpoint: i };
+          pausedRef.current = true;
           setShop({ open: true, checkpoint: i });
+          setPaused(true);
+          persistGameSession(true);
           break;
         }
       }
@@ -1902,6 +2010,7 @@ function Game() {
       updatePlayer(dt);
       updateRealtime(dt);
       draw();
+      persistGameSession();
       raf = requestAnimationFrame(loop);
     };
 
