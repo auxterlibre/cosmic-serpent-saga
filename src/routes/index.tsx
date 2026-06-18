@@ -549,14 +549,12 @@ function loadGameSession(): GameSession | null {
 
 function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const restoredSessionRef = useRef<GameSession | null>(loadGameSession());
-  const [initialGameState] = useState(() => restoredSessionRef.current?.state ?? initialState());
+  const restoredSessionRef = useRef<GameSession | null>(null);
+  const [initialGameState] = useState(() => initialState());
   const stateRef = useRef(initialGameState);
-  const startedRef = useRef(restoredSessionRef.current?.started ?? false);
-  const pausedRef = useRef(restoredSessionRef.current?.paused ?? false);
-  const shopRef = useRef<{ open: boolean; checkpoint: number | null }>(
-    restoredSessionRef.current?.shop ?? { open: false, checkpoint: null },
-  );
+  const startedRef = useRef(false);
+  const pausedRef = useRef(false);
+  const shopRef = useRef<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
   const lastPersistRef = useRef(0);
   const [, force] = useState(0);
   const [hud, setHud] = useState(() => ({
@@ -578,9 +576,43 @@ function Game() {
     lvlCap: initialGameState.lvlCap,
     segCap: initialGameState.segCap,
   }));
-  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>(shopRef.current);
-  const [started, setStarted] = useState(startedRef.current);
-  const [paused, setPaused] = useState(pausedRef.current);
+  const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>({ open: false, checkpoint: null });
+  const [started, setStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    const saved = loadGameSession();
+    if (saved) {
+      restoredSessionRef.current = saved;
+      stateRef.current = saved.state;
+      startedRef.current = saved.started;
+      pausedRef.current = saved.paused;
+      shopRef.current = saved.shop;
+      setShop(saved.shop);
+      setStarted(saved.started);
+      setPaused(saved.paused);
+      setHud({
+        score: saved.state.score,
+        length: saved.state.snake.length,
+        alive: saved.state.alive,
+        fireIntervalMs: saved.state.fireIntervalMs,
+        damage: saved.state.damage,
+        fireRange: saved.state.fireRange,
+        multishot: saved.state.multishot,
+        playerSpeed: saved.state.playerSpeed,
+        inventory: computeInventory(saved.state.snake, saved.state.growth, saved.state.scrap),
+        scrap: saved.state.scrap,
+        lvlFireRate: saved.state.lvlFireRate,
+        lvlDamage: saved.state.lvlDamage,
+        lvlRange: saved.state.lvlRange,
+        lvlMultishot: saved.state.lvlMultishot,
+        lvlSpeed: saved.state.lvlSpeed,
+        lvlCap: saved.state.lvlCap,
+        segCap: saved.state.segCap,
+      });
+    }
+    setHydrated(true);
+  }, []);
   const [flash, setFlash] = useState<Record<string, number>>({});
   const flashRes = (keys: string[]) => {
     const now = Date.now();
