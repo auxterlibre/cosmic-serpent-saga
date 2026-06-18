@@ -1652,7 +1652,7 @@ function Game() {
           }
           for (let i = 0; i < s.hunters.length; i++) {
             const h = s.hunters[i];
-            if (h.eliteT0 !== undefined) continue; // invulnerable during transformation
+            if (h.eliteT0 !== undefined || h.wardenT0 !== undefined) continue; // invulnerable during transformation
             const hr = HIT_R + Math.min(0.6, h.hp * 0.08);
             const dx = p.x - (h.x + 0.5);
             const dy = p.y - (h.y + 0.5);
