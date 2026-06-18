@@ -558,25 +558,25 @@ function Game() {
   );
   const lastPersistRef = useRef(0);
   const [, force] = useState(0);
-  const [hud, setHud] = useState({
-    score: 0,
-    length: 1,
-    alive: true,
-    fireIntervalMs: 2000,
-    damage: 1,
-    fireRange: 8,
-    multishot: 1,
-    playerSpeed: BASE_PLAYER_SPEED,
-    inventory: emptyCost(),
-    scrap: 0,
-    lvlFireRate: 1,
-    lvlDamage: 1,
-    lvlRange: 1,
-    lvlMultishot: 1,
-    lvlSpeed: 1,
-    lvlCap: 1,
-    segCap: INITIAL_CAP,
-  });
+  const [hud, setHud] = useState(() => ({
+    score: initialGameState.score,
+    length: initialGameState.snake.length,
+    alive: initialGameState.alive,
+    fireIntervalMs: initialGameState.fireIntervalMs,
+    damage: initialGameState.damage,
+    fireRange: initialGameState.fireRange,
+    multishot: initialGameState.multishot,
+    playerSpeed: initialGameState.playerSpeed,
+    inventory: computeInventory(initialGameState.snake, initialGameState.growth, initialGameState.scrap),
+    scrap: initialGameState.scrap,
+    lvlFireRate: initialGameState.lvlFireRate,
+    lvlDamage: initialGameState.lvlDamage,
+    lvlRange: initialGameState.lvlRange,
+    lvlMultishot: initialGameState.lvlMultishot,
+    lvlSpeed: initialGameState.lvlSpeed,
+    lvlCap: initialGameState.lvlCap,
+    segCap: initialGameState.segCap,
+  }));
   const [shop, setShop] = useState<{ open: boolean; checkpoint: number | null }>(shopRef.current);
   const [started, setStarted] = useState(startedRef.current);
   const [paused, setPaused] = useState(pausedRef.current);
