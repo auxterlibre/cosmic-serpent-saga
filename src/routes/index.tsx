@@ -38,6 +38,8 @@ const ELITE_FIRE_INTERVAL = 1400;
 const ELITE_SHOT_LIFE = 3500;
 const ELITE_RENDER_SCALE = 1.8;
 const ELITE_TRANSFORM_DURATION = 1800; // ms — segments orbit then smash inward
+const WARDEN_TRANSFORM_DURATION = 2200; // ms — elite → Warden metamorphosis
+const WARDEN_UPGRADE_SEGMENTS = 5; // stolen segments an elite needs to ascend to Warden
 // Warden: a heavy turret ship — slow, tough, fires aimed shots from range.
 const WARDEN_SPEED = 2.0;
 const WARDEN_HP = 5;
