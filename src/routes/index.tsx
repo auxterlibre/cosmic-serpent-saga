@@ -1772,7 +1772,7 @@ function Game() {
               h.hp -= s.damage;
               h.hitT0 = performance.now();
               if (h.hp <= 0) {
-                s.score += 15;
+                s.score += h.elite ? 40 : 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
                 // Hunters drop scrap parts on death — must be picked up like loot.
                 dropScraps(h.x + 0.5, h.y + 0.5, 2 + Math.floor(Math.random() * 3));
@@ -3683,9 +3683,7 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
           <div className="rounded-lg border border-cyan-500/40 bg-[#0a0a18] px-8 py-6 text-center font-mono text-cyan-200">
             <div className="text-2xl">GAME OVER</div>
-            <div className="mt-2 text-sm opacity-80">
-              Score {hud.score} · Length {hud.length}
-            </div>
+            <div className="mt-2 text-sm opacity-80">Score {hud.score}</div>
             <button
               onClick={reset}
               className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
