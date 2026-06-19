@@ -3683,9 +3683,7 @@ function Game() {
         <div className="absolute inset-0 flex items-center justify-center bg-black/60 px-4">
           <div className="rounded-lg border border-cyan-500/40 bg-[#0a0a18] px-8 py-6 text-center font-mono text-cyan-200">
             <div className="text-2xl">GAME OVER</div>
-            <div className="mt-2 text-sm opacity-80">
-              Score {hud.score} · Length {hud.length}
-            </div>
+            <div className="mt-2 text-sm opacity-80">Score {hud.score}</div>
             <button
               onClick={reset}
               className="pointer-events-auto mt-4 rounded bg-cyan-500/20 px-4 py-2 text-sm transition-transform duration-75 hover:bg-cyan-500/30 active:scale-[0.97] active:brightness-125"
