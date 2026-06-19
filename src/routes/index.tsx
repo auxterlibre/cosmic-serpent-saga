@@ -1772,7 +1772,7 @@ function Game() {
               h.hp -= s.damage;
               h.hitT0 = performance.now();
               if (h.hp <= 0) {
-                s.score += 15;
+                s.score += h.elite ? 40 : 15;
                 s.explosions.push({ x: h.x + 0.5, y: h.y + 0.5, t0: performance.now() });
                 // Hunters drop scrap parts on death — must be picked up like loot.
                 dropScraps(h.x + 0.5, h.y + 0.5, 2 + Math.floor(Math.random() * 3));
